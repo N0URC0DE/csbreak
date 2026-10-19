@@ -33,10 +33,10 @@
     --panel-top: #f8f9fb;
     --panel-bottom: #f0f2f6;
     --line: #e1e4ea;
-    --text: #15171c;
-    --text-2: #2a2d34;
-    --muted: #5d6270;
-    --faint: #8a8f9c;
+    --text: #0d0f13;
+    --text-2: #16181e;
+    --muted: #3d4250;
+    --faint: #5f6473;
     --surface: #eef0f4;
     --surface-press: #e2e5eb;
     --ring-track: #e3e6ec;
@@ -449,6 +449,59 @@
     cursor: pointer;
   }
 
+  /* ---------- Install banner ---------- */
+  .install {
+    position: fixed;
+    left: 50%;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 10;
+    width: calc(100% - 32px);
+    max-width: 400px;
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    gap: 12px;
+    padding: 12px 10px 12px 12px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--line);
+    -webkit-border-radius: 18px; border-radius: 18px;
+    -webkit-box-shadow: 0 10px 30px var(--card-shadow);
+    box-shadow: 0 10px 30px var(--card-shadow);
+    -webkit-transform: translateX(-50%); transform: translateX(-50%);
+    -webkit-animation: slideUp 0.35s ease-out; animation: slideUp 0.35s ease-out;
+  }
+  .install[hidden] { display: none; }
+  @-webkit-keyframes slideUp { from { -webkit-transform: translate(-50%, 120%); } to { -webkit-transform: translate(-50%, 0); } }
+  @keyframes slideUp { from { transform: translate(-50%, 120%); } to { transform: translate(-50%, 0); } }
+  .install img { width: 40px; height: 40px; -webkit-flex-shrink: 0; flex-shrink: 0; -webkit-border-radius: 10px; border-radius: 10px; }
+  .install-text { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; font-size: 0.8rem; line-height: 1.35; color: var(--muted); }
+  .install-text strong { display: block; font-size: 0.9rem; color: var(--text); }
+  .install-text svg { vertical-align: -3px; }
+  .install-btn {
+    -webkit-flex-shrink: 0; flex-shrink: 0;
+    height: 34px;
+    padding: 0 14px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffffff;
+    background-color: var(--accent);
+    -webkit-border-radius: 17px; border-radius: 17px;
+  }
+  .install-btn:active { background-color: var(--accent-press); }
+  .install-btn[hidden] { display: none; }
+  .install-close {
+    -webkit-flex-shrink: 0; flex-shrink: 0;
+    width: 28px; height: 28px;
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+    color: var(--faint);
+    background-color: transparent;
+    -webkit-border-radius: 50%; border-radius: 50%;
+  }
+  .install-close:active { background-color: var(--surface); }
+  /* Keep the footer reachable above the banner */
+  body.has-install { padding-bottom: 96px; }
+
   /* ---------- Credits ---------- */
   .credits {
     margin-top: 18px;
@@ -549,6 +602,18 @@
 
   </section>
 </main>
+
+<div class="install" id="installBar" role="dialog" aria-labelledby="installTitle" hidden>
+  <img src="icons/icon-192.png" alt="">
+  <div class="install-text">
+    <strong id="installTitle">Add Break Timer to your phone</strong>
+    <span id="installHint">Opens like an app and works offline.</span>
+  </div>
+  <button type="button" class="install-btn" id="installBtn">Install</button>
+  <button type="button" class="install-close" id="installClose" aria-label="Dismiss">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+  </button>
+</div>
 
 <footer class="credits">
   &copy; <span id="year">2026</span> <a class="footer-link" href="https://nourcode.com/" target="_blank" rel="noopener noreferrer">NourCode</a> | Rest well, return on time
@@ -969,6 +1034,58 @@
   renderDuration();
   render();
   setInterval(render, 1000);
+
+  // ---------- Install banner ----------
+  // Android/desktop Chrome: our own Install button triggers the browser's install dialog.
+  // iPhone/iPad: there is no install API, so the banner explains Share → Add to Home Screen.
+  // Hidden once installed, and for a week after the user closes it.
+  var INSTALL_DISMISS_KEY = 'breakCalc.installDismissed';
+  var installBar = $('installBar');
+  var installEvent = null;
+  var isInstalled = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as a Mac
+  function dismissedRecently() {
+    var t = +readStore(INSTALL_DISMISS_KEY);
+    return t && Date.now() - t < 7 * 24 * 60 * MIN;
+  }
+  function showInstall(mode) {
+    if (isInstalled || dismissedRecently()) return;
+    $('installBtn').hidden = mode !== 'prompt';
+    if (mode !== 'ios') {
+      $('installHint').textContent = 'Opens like an app and works offline.';
+    } else {
+      $('installHint').innerHTML = 'Tap <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M12 15V3"/><polyline points="8 7 12 3 16 7"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> Share, then <b>Add to Home Screen</b>.';
+    }
+    installBar.hidden = false;
+    document.body.classList.add('has-install');
+  }
+  function hideInstall() {
+    installBar.hidden = true;
+    document.body.classList.remove('has-install');
+  }
+  if (/^https?:$/.test(location.protocol)) {
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault(); // show our banner instead of the browser's default one
+      installEvent = e;
+      showInstall('prompt');
+    });
+    if (isIOS) showInstall('ios');
+  }
+  $('installBtn').addEventListener('click', function () {
+    if (!installEvent) return;
+    installEvent.prompt();
+    installEvent.userChoice.then(function (choice) {
+      installEvent = null;
+      hideInstall();
+      if (choice.outcome !== 'accepted') writeStore(INSTALL_DISMISS_KEY, String(Date.now()));
+    });
+  });
+  $('installClose').addEventListener('click', function () {
+    hideInstall();
+    writeStore(INSTALL_DISMISS_KEY, String(Date.now()));
+  });
+  window.addEventListener('appinstalled', function () { isInstalled = true; hideInstall(); });
 
   // Offline + installable: service workers only run over http(s), not when opened as a file.
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
