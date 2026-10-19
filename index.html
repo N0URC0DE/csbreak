@@ -259,8 +259,8 @@
   @keyframes glowRed { 0%, 100% { box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { box-shadow: 0 0 14px 6px rgba(245, 120, 120, 0.9); } }
 
   /* ---------- Controls ---------- */
-  .controls { padding: 14px 20px 16px; }
-  .ctl-label { display: block; margin-bottom: 8px; font-size: 0.95rem; font-weight: 700; color: var(--text-2); }
+  .controls { padding: 16px 20px 14px; }
+  .ctl-label { display: block; margin-bottom: 10px; font-size: 0.95rem; font-weight: 700; color: var(--text-2); }
 
   .label-row {
     display: -webkit-box; display: -webkit-flex; display: flex;
@@ -272,7 +272,7 @@
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
     gap: 6px;
     height: 32px;
-    margin-top: -6px;
+    margin-top: -7px;
     padding: 0 14px;
     font-size: 0.95rem;
     font-weight: 700;
@@ -288,7 +288,7 @@
 
   /* Wheel time picker */
   .wheel {
-    --row: 32px;
+    --row: 34px;
     position: relative;
     display: -webkit-box; display: -webkit-flex; display: flex;
     height: calc(var(--row) * 3);
@@ -363,8 +363,8 @@
   .chip:active { background-color: var(--surface-press); }
   .chip.active { border-color: var(--accent); color: var(--accent-soft); }
 
-  .slider-block { margin-top: 4px; }
-  .time-block { margin-top: 12px; }
+  .slider-block { margin-top: 10px; }
+  .time-block { margin-top: 18px; }
   .slider-row {
     display: -webkit-box; display: -webkit-flex; display: flex;
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
@@ -410,7 +410,7 @@
   .start-btn {
     width: 100%;
     height: 46px;
-    margin-top: 14px;
+    margin-top: 18px;
     font-size: 1.05rem;
     font-weight: 700;
     color: #ffffff;
@@ -438,8 +438,6 @@
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
     gap: 10px;
     margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--line);
     font-size: 0.9rem;
     color: var(--muted);
     cursor: pointer;
