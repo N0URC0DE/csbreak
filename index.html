@@ -501,8 +501,6 @@
     -webkit-border-radius: 50%; border-radius: 50%;
   }
   .install-close:active { background-color: var(--surface); }
-  /* Push the card down so the banner doesn't cover its top */
-  body.has-install { padding-top: calc(env(safe-area-inset-top) + 88px); }
 
   /* ---------- Credits ---------- */
   .credits {
@@ -1045,24 +1043,30 @@
   // ---------- Install banner ----------
   // Android/desktop Chrome: our own Install button triggers the browser's install dialog.
   // iPhone/iPad: there is no install API, so the banner explains Share → Add to Home Screen.
-  // Hidden once installed, and for a week after the user closes it. The install button in the
-  // top-right corner stays available (until installed) to bring it back on demand.
-  var INSTALL_DISMISS_KEY = 'breakCalc.installDismissed';
+  // It shows by itself on up to INSTALL_MAX_SHOWS visits (closing it only hides it for that visit),
+  // never once installed. The install button in the top-right corner brings it back any time.
+  var INSTALL_SHOWS_KEY = 'breakCalc.installShows';
+  var INSTALL_MAX_SHOWS = 5;
+  var shownThisVisit = false;
+  removeStore('breakCalc.installDismissed'); // replaced by the visit count
   var installBar = $('installBar');
   var installEvent = null;
   var isInstalled = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as a Mac
-  function dismissedRecently() {
-    var t = +readStore(INSTALL_DISMISS_KEY);
-    return t && Date.now() - t < 7 * 24 * 60 * MIN;
-  }
   var canInstall = /^https?:$/.test(location.protocol);
   function updateInstallCorner() {
     $('installCorner').hidden = !canInstall || isInstalled || !(installEvent || isIOS);
   }
   function showInstall(mode, force) {
-    if (isInstalled || (!force && dismissedRecently())) return;
+    if (isInstalled) return;
+    if (!force && !shownThisVisit) {
+      // Count each visit the banner appears on by itself; stop after the limit.
+      var shows = +readStore(INSTALL_SHOWS_KEY) || 0;
+      if (shows >= INSTALL_MAX_SHOWS) return;
+      writeStore(INSTALL_SHOWS_KEY, String(shows + 1));
+      shownThisVisit = true;
+    }
     $('installBtn').hidden = mode !== 'prompt';
     if (mode !== 'ios') {
       $('installHint').textContent = 'Opens like an app and works offline.';
@@ -1070,11 +1074,9 @@
       $('installHint').innerHTML = 'Tap <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M12 15V3"/><polyline points="8 7 12 3 16 7"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> Share, then <b>Add to Home Screen</b>.';
     }
     installBar.hidden = false;
-    document.body.classList.add('has-install');
   }
   function hideInstall() {
     installBar.hidden = true;
-    document.body.classList.remove('has-install');
   }
   if (canInstall) {
     window.addEventListener('beforeinstallprompt', function (e) {
@@ -1092,22 +1094,15 @@
       installEvent = null; // the browser offers it again later if still not installed
       hideInstall();
       updateInstallCorner();
-      if (choice.outcome !== 'accepted') writeStore(INSTALL_DISMISS_KEY, String(Date.now()));
     });
   }
   $('installBtn').addEventListener('click', promptInstall);
   $('installCorner').addEventListener('click', function () {
     if (installEvent) promptInstall();
-    else if (isIOS) { // iPhone: show the Share → Add to Home Screen steps
-      showInstall('ios', true);
-      window.scrollTo(0, 0);
-    }
+    else if (isIOS) showInstall('ios', true); // iPhone: show the Share → Add to Home Screen steps
   });
   updateInstallCorner();
-  $('installClose').addEventListener('click', function () {
-    hideInstall();
-    writeStore(INSTALL_DISMISS_KEY, String(Date.now()));
-  });
+  $('installClose').addEventListener('click', hideInstall);
   window.addEventListener('appinstalled', function () { isInstalled = true; hideInstall(); updateInstallCorner(); });
 
   // Offline + installable: service workers only run over http(s), not when opened as a file.
