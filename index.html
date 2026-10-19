@@ -99,8 +99,8 @@
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
     -webkit-box-pack: start; -webkit-justify-content: flex-start; justify-content: flex-start;
     /* No gap above the card; only the phone's notch/status-bar area is kept clear. */
-    padding: 0 16px 20px;
-    padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    padding: 0 16px 10px;
+    padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
     color: var(--text);
     background-color: var(--page-bg);
@@ -126,7 +126,7 @@
   /* ---------- Top timeline panel ---------- */
   .panel {
     position: relative;
-    padding: 24px 0 22px;
+    padding: 16px 0 14px;
     background-color: var(--panel-bottom);
     background-image: -webkit-linear-gradient(top, var(--panel-top), var(--panel-bottom));
     background-image: linear-gradient(to bottom, var(--panel-top), var(--panel-bottom));
@@ -168,8 +168,8 @@
   /* ---------- Progress ring ---------- */
   .ring-wrap {
     position: relative;
-    width: 170px; height: 170px;
-    margin: 14px auto 0;
+    width: 150px; height: 150px;
+    margin: 8px auto 0;
   }
   .ring { display: block; width: 100%; height: 100%; }
   .ring-track { fill: none; stroke: var(--ring-track); stroke-width: 14; }
@@ -210,7 +210,7 @@
     -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
   }
   .ring-big {
-    font-size: 2.1rem;
+    font-size: 1.9rem;
     font-weight: 800;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
@@ -223,7 +223,7 @@
     display: -webkit-box; display: -webkit-flex; display: flex;
     -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
     max-width: 360px;
-    margin: 10px auto 0;
+    margin: 6px auto 0;
     padding: 0 20px;
   }
   .ring-times > div { text-align: center; min-width: 76px; }
@@ -259,8 +259,8 @@
   @keyframes glowRed { 0%, 100% { box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { box-shadow: 0 0 14px 6px rgba(245, 120, 120, 0.9); } }
 
   /* ---------- Controls ---------- */
-  .controls { padding: 22px 20px; }
-  .ctl-label { display: block; margin-bottom: 12px; font-size: 0.95rem; font-weight: 700; color: var(--text-2); }
+  .controls { padding: 14px 20px 16px; }
+  .ctl-label { display: block; margin-bottom: 8px; font-size: 0.95rem; font-weight: 700; color: var(--text-2); }
 
   .label-row {
     display: -webkit-box; display: -webkit-flex; display: flex;
@@ -271,9 +271,9 @@
     display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex;
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
     gap: 6px;
-    height: 36px;
-    margin-top: -9px;
-    padding: 0 16px;
+    height: 32px;
+    margin-top: -6px;
+    padding: 0 14px;
     font-size: 0.95rem;
     font-weight: 700;
     color: #ffffff;
@@ -288,7 +288,7 @@
 
   /* Wheel time picker */
   .wheel {
-    --row: 36px;
+    --row: 32px;
     position: relative;
     display: -webkit-box; display: -webkit-flex; display: flex;
     height: calc(var(--row) * 3);
@@ -363,8 +363,8 @@
   .chip:active { background-color: var(--surface-press); }
   .chip.active { border-color: var(--accent); color: var(--accent-soft); }
 
-  .slider-block { margin-top: 26px; }
-  .time-block { margin-top: 26px; }
+  .slider-block { margin-top: 4px; }
+  .time-block { margin-top: 12px; }
   .slider-row {
     display: -webkit-box; display: -webkit-flex; display: flex;
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
@@ -383,7 +383,7 @@
     -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
     min-width: 0;
     height: 4px;
-    margin: 14px 0;
+    margin: 12px 0;
     background-color: var(--line);
     background-image: -webkit-linear-gradient(left, var(--accent) var(--pct), transparent var(--pct));
     background-image: linear-gradient(to right, var(--accent) var(--pct), transparent var(--pct));
@@ -409,8 +409,8 @@
 
   .start-btn {
     width: 100%;
-    height: 50px;
-    margin-top: 26px;
+    height: 46px;
+    margin-top: 14px;
     font-size: 1.05rem;
     font-weight: 700;
     color: #ffffff;
@@ -437,8 +437,8 @@
     display: -webkit-box; display: -webkit-flex; display: flex;
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
     gap: 10px;
-    margin-top: 22px;
-    padding-top: 18px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid var(--line);
     font-size: 0.9rem;
     color: var(--muted);
@@ -504,7 +504,7 @@
 
   /* ---------- Credits ---------- */
   .credits {
-    margin-top: 18px;
+    margin-top: 8px;
     text-align: center;
     font-size: 0.8rem;
     line-height: 1.6;
@@ -563,7 +563,7 @@
 
   <section class="controls">
     <div>
-      <span class="ctl-label" id="chipsLabel">Quick durations</span>
+      <span class="ctl-label" id="chipsLabel">Break duration</span>
       <div class="chips" role="group" aria-labelledby="chipsLabel">
         <button type="button" class="chip" data-min="15">15 min</button>
         <button type="button" class="chip" data-min="30">30 min</button>
@@ -573,9 +573,8 @@
     </div>
 
     <div class="slider-block">
-      <label class="ctl-label" for="duration">Exact break duration</label>
       <div class="slider-row">
-        <input type="range" id="duration" min="1" max="120" step="1" value="15">
+        <input type="range" id="duration" aria-label="Exact break duration" min="1" max="120" step="1" value="15">
         <span class="slider-value" id="durationValue">15 min</span>
       </div>
     </div>
@@ -602,7 +601,7 @@
 
     <label class="save-row">
       <input type="checkbox" id="autoStopToggle" checked>
-      Stop the timer automatically when the break ends
+      Auto-stop when the break ends
     </label>
 
   </section>
