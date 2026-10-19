@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1b1c20">
+<title>Break Timer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+    padding: 20px 16px;
+    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #ffffff;
+    background-color: #1b1c20;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 400px; /* mobile-only app: same phone layout on tablets and laptops */
+    overflow: hidden;
+    background-color: #26272c;
+    -webkit-border-radius: 32px;
+    border-radius: 32px;
+    -webkit-box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  }
+
+  button { font: inherit; cursor: pointer; border: none; color: inherit; -webkit-tap-highlight-color: transparent; }
+  button:focus-visible, input:focus-visible, .wheel-col:focus-visible { outline: 2px solid #6b8ff0; outline-offset: 2px; }
+
+  /* ---------- Top timeline panel ---------- */
+  .panel {
+    padding: 24px 0 22px;
+    background-color: #0e0e0e;
+    background-image: -webkit-linear-gradient(top, #151515, #0a0a0a);
+    background-image: linear-gradient(to bottom, #151515, #0a0a0a);
+    border-bottom: 1px solid #3a3b40;
+  }
+
+  .status {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #4470ea;
+  }
+
+  .status-row {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+    gap: 10px;
+  }
+  .live-dot {
+    display: none;
+    position: relative;
+    width: 10px; height: 10px;
+    background-color: #4caf50;
+    -webkit-border-radius: 50%; border-radius: 50%;
+  }
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    -webkit-border-radius: 50%; border-radius: 50%;
+    background-color: #4caf50;
+    -webkit-animation: ping 1.4s ease-out infinite;
+    animation: ping 1.4s ease-out infinite;
+  }
+  @-webkit-keyframes ping { from { -webkit-transform: scale(1); opacity: 0.7; } to { -webkit-transform: scale(2.8); opacity: 0; } }
+  @keyframes ping { from { transform: scale(1); opacity: 0.7; } to { transform: scale(2.8); opacity: 0; } }
+
+  /* ---------- Progress ring ---------- */
+  .ring-wrap {
+    position: relative;
+    width: 170px; height: 170px;
+    margin: 14px auto 0;
+  }
+  .ring { display: block; width: 100%; height: 100%; }
+  .ring-track { fill: none; stroke: #2c2d32; stroke-width: 14; }
+  .ring-sec-track { fill: none; stroke: #1f2024; stroke-width: 2; }
+  .ring-fill {
+    fill: none;
+    stroke: #4470ea;
+    stroke-width: 14;
+    stroke-linecap: round;
+    -webkit-transition: stroke-dashoffset 1s linear, stroke 0.6s;
+    transition: stroke-dashoffset 1s linear, stroke 0.6s;
+  }
+  /* Rotating layers: the progress head and the seconds sweep */
+  .ring-head, .ring-sec {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none;
+    pointer-events: none;
+  }
+  .ring-head {
+    -webkit-transition: -webkit-transform 1s linear;
+    transition: transform 1s linear;
+  }
+  .ring-head span, .ring-sec span {
+    position: absolute;
+    left: 50%;
+    -webkit-border-radius: 50%; border-radius: 50%;
+    background-color: #ffffff;
+  }
+  .ring-head span { top: calc(6.36% - 7px); width: 14px; height: 14px; margin-left: -7px; }
+  .ring-sec span { top: calc(13.64% - 4px); width: 8px; height: 8px; margin-left: -4px; background-color: #8fa8f5; }
+  .ring-center {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  }
+  .ring-big {
+    font-size: 2.1rem;
+    font-weight: 800;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    -webkit-transition: color 0.6s;
+    transition: color 0.6s;
+  }
+  .ring-small { margin-top: 4px; font-size: 0.8rem; color: #c9c9cc; }
+
+  .ring-times {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+    max-width: 360px;
+    margin: 10px auto 0;
+    padding: 0 20px;
+  }
+  .ring-times > div { text-align: center; min-width: 76px; }
+  .tl-pct { font-size: 0.78rem; font-weight: 600; color: #c9c9cc; }
+  .tl-label { font-size: 0.82rem; color: #c9c9cc; }
+  .tl-time { margin-top: 2px; min-height: 1.3em; font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Running: live dot, glowing head, seconds dot sweeping once a minute */
+  .running .live-dot { display: block; }
+  .running .ring-head, .running .ring-sec { display: block; }
+  .running .ring-head span {
+    -webkit-animation: glow 1.4s ease-in-out infinite;
+    animation: glow 1.4s ease-in-out infinite;
+  }
+  .running .ring-sec {
+    -webkit-animation: spin 60s linear infinite;
+    animation: spin 60s linear infinite;
+  }
+  @-webkit-keyframes spin { from { -webkit-transform: rotate(0deg); } to { -webkit-transform: rotate(360deg); } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @-webkit-keyframes glow { 0%, 100% { -webkit-box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { -webkit-box-shadow: 0 0 14px 6px rgba(143, 168, 245, 0.85); } }
+  @keyframes glow { 0%, 100% { box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { box-shadow: 0 0 14px 6px rgba(143, 168, 245, 0.85); } }
+
+  /* Last 15% of the break: everything that was blue turns red */
+  .warning .status,
+  .warning .ring-big { color: #e5484d; }
+  .warning .ring-fill { stroke: #e5484d; }
+  .warning .ring-sec span { background-color: #f5a3a3; }
+  .warning .live-dot,
+  .warning .live-dot::after { background-color: #e5484d; }
+  .warning .ring-head span { -webkit-animation-name: glowRed; animation-name: glowRed; }
+  @-webkit-keyframes glowRed { 0%, 100% { -webkit-box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { -webkit-box-shadow: 0 0 14px 6px rgba(245, 120, 120, 0.9); } }
+  @keyframes glowRed { 0%, 100% { box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { box-shadow: 0 0 14px 6px rgba(245, 120, 120, 0.9); } }
+
+  /* ---------- Controls ---------- */
+  .controls { padding: 22px 20px; }
+  .ctl-label { display: block; margin-bottom: 12px; font-size: 0.95rem; font-weight: 700; color: #e4e4e7; }
+
+  .label-row {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start;
+    -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  }
+  .now-btn {
+    display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    gap: 6px;
+    height: 36px;
+    margin-top: -9px;
+    padding: 0 16px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffffff;
+    background-color: #4470ea;
+    -webkit-border-radius: 18px; border-radius: 18px;
+    -webkit-box-shadow: 0 4px 12px rgba(68, 112, 234, 0.35);
+    box-shadow: 0 4px 12px rgba(68, 112, 234, 0.35);
+    -webkit-transition: -webkit-transform 0.1s, background-color 0.2s;
+    transition: transform 0.1s, background-color 0.2s;
+  }
+  .now-btn:active { -webkit-transform: scale(0.95); transform: scale(0.95); background-color: #3a62d6; }
+
+  /* Wheel time picker */
+  .wheel {
+    --row: 36px;
+    position: relative;
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    height: calc(var(--row) * 3);
+    padding: 0 6px;
+    background-color: #33353b;
+    -webkit-border-radius: 12px; border-radius: 12px;
+    overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  .wheel::before {
+    content: "";
+    position: absolute;
+    left: 6px; right: 6px;
+    top: calc(var(--row) * 1);
+    height: var(--row);
+    background-color: rgba(255, 255, 255, 0.08);
+    -webkit-border-radius: 8px; border-radius: 8px;
+    pointer-events: none;
+  }
+  .wheel-col {
+    -webkit-box-flex: 1; -webkit-flex: 1 1 0; flex: 1 1 0;
+    height: 100%;
+    padding: calc(var(--row) * 1) 0;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+    -webkit-scroll-snap-type: y mandatory;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+    -webkit-mask-image: -webkit-linear-gradient(top, transparent, #000 30%, #000 70%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+    -webkit-border-radius: 8px; border-radius: 8px;
+  }
+  .wheel-col::-webkit-scrollbar { display: none; }
+  .wheel-item {
+    height: var(--row);
+    line-height: var(--row);
+    text-align: center;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #8b8c92;
+    font-variant-numeric: tabular-nums;
+    scroll-snap-align: center;
+    cursor: pointer;
+    -webkit-transition: color 0.15s;
+    transition: color 0.15s;
+  }
+  .wheel-item.sel { color: #ffffff; font-weight: 700; }
+  .wheel-sep {
+    -webkit-align-self: center; align-self: center;
+    font-size: 1.15rem; font-weight: 700;
+    color: #ffffff;
+    position: relative;
+  }
+
+  .chips {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    gap: 8px;
+  }
+  .chip {
+    -webkit-box-flex: 1; -webkit-flex: 1 1 0; flex: 1 1 0;
+    height: 36px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    white-space: nowrap;
+    background-color: #33353b;
+    border: 1px solid transparent;
+    -webkit-border-radius: 18px; border-radius: 18px;
+    -webkit-transition: background-color 0.2s, border-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+  .chip:active { background-color: #3d3f46; }
+  .chip.active { border-color: #4470ea; color: #8fa8f5; }
+
+  .slider-block { margin-top: 26px; }
+  .time-block { margin-top: 26px; }
+  .slider-row {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    gap: 16px;
+  }
+  .slider-value {
+    -webkit-flex-shrink: 0; flex-shrink: 0;
+    min-width: 64px;
+    text-align: right;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  input[type="range"] {
+    --pct: 0%;
+    -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+    min-width: 0;
+    height: 4px;
+    margin: 14px 0;
+    background-color: #3a3b40;
+    background-image: -webkit-linear-gradient(left, #4470ea var(--pct), transparent var(--pct));
+    background-image: linear-gradient(to right, #4470ea var(--pct), transparent var(--pct));
+    -webkit-border-radius: 2px; border-radius: 2px;
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 26px; height: 26px;
+    background-color: #4470ea;
+    border: none;
+    -webkit-border-radius: 50%; border-radius: 50%;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 26px; height: 26px;
+    background-color: #4470ea;
+    border: none;
+    border-radius: 50%;
+  }
+  input[type="range"]::-moz-range-progress { background-color: #4470ea; height: 4px; border-radius: 2px; }
+
+  .start-btn {
+    width: 100%;
+    height: 50px;
+    margin-top: 26px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #ffffff;
+    background-color: #4470ea;
+    -webkit-border-radius: 25px; border-radius: 25px;
+    -webkit-transition: -webkit-transform 0.12s, background-color 0.2s;
+    transition: transform 0.12s, background-color 0.2s;
+  }
+  .start-btn:active { -webkit-transform: scale(0.98); transform: scale(0.98); background-color: #3a62d6; }
+  .start-btn.stop { background-color: #d64545; }
+  .start-btn.stop:active { background-color: #bb3a3a; }
+
+  .summary {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e4e4e7;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary[hidden] { display: none; }
+
+  .save-row {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    gap: 10px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid #3a3b40;
+    font-size: 0.9rem;
+    color: #c9c9cc;
+    cursor: pointer;
+  }
+  .save-row input {
+    width: 20px; height: 20px;
+    -webkit-flex-shrink: 0; flex-shrink: 0;
+    accent-color: #4470ea;
+    cursor: pointer;
+  }
+
+  /* ---------- Credits ---------- */
+  .credits {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #8b8c92;
+  }
+  .footer-link { color: #8fa8f5; font-weight: 700; text-decoration: none; }
+  .footer-link:hover, .footer-link:focus-visible { text-decoration: underline; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { -webkit-transition: none !important; transition: none !important; -webkit-animation: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<main class="card">
+  <section class="panel" aria-label="Break status">
+    <div class="status-row">
+      <span class="live-dot" aria-hidden="true"></span>
+      <h1 class="status" id="status" role="status" aria-live="polite">Ready to start</h1>
+    </div>
+    <p class="summary" id="summary" role="status" hidden></p>
+
+    <div class="ring-wrap" id="track" role="progressbar" aria-label="Elapsed" aria-valuemin="0" aria-valuemax="100">
+      <svg class="ring" viewBox="0 0 220 220" aria-hidden="true">
+        <circle class="ring-track" cx="110" cy="110" r="96"/>
+        <circle class="ring-sec-track" cx="110" cy="110" r="80"/>
+        <circle class="ring-fill" id="ringFill" cx="110" cy="110" r="96" transform="rotate(-90 110 110)"/>
+      </svg>
+      <div class="ring-sec" id="ringSec"><span></span></div>
+      <div class="ring-head" id="ringHead"><span></span></div>
+      <div class="ring-center">
+        <div class="ring-big" id="ringBig">15:00</div>
+        <div class="ring-small" id="ringSmall">remaining</div>
+      </div>
+    </div>
+    <div class="ring-times">
+      <div><div class="tl-label">Start</div><div class="tl-time" id="tlStart"></div></div>
+      <div><div class="tl-label">Elapsed</div><div class="tl-time"><span id="elapsed"></span> <span class="tl-pct" id="percent"></span></div></div>
+      <div><div class="tl-label">End</div><div class="tl-time" id="tlEnd"></div></div>
+    </div>
+  </section>
+
+  <section class="controls">
+    <div>
+      <span class="ctl-label" id="chipsLabel">Quick durations</span>
+      <div class="chips" role="group" aria-labelledby="chipsLabel">
+        <button type="button" class="chip" data-min="15">15 min</button>
+        <button type="button" class="chip" data-min="30">30 min</button>
+        <button type="button" class="chip" data-min="45">45 min</button>
+        <button type="button" class="chip" data-min="60">60 min</button>
+      </div>
+    </div>
+
+    <div class="slider-block">
+      <label class="ctl-label" for="duration">Exact break duration</label>
+      <div class="slider-row">
+        <input type="range" id="duration" min="1" max="120" step="1" value="15">
+        <span class="slider-value" id="durationValue">15 min</span>
+      </div>
+    </div>
+
+    <div class="time-block">
+      <div class="label-row">
+        <span class="ctl-label" id="wheelLabel">Break start time</span>
+        <button type="button" class="now-btn" id="nowBtn" aria-label="Set start time to now">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>
+          </svg>
+          Now
+        </button>
+      </div>
+      <div class="wheel" id="wheel" role="group" aria-labelledby="wheelLabel">
+        <div class="wheel-col" id="colHour" tabindex="0" role="spinbutton" aria-label="Hour"></div>
+        <div class="wheel-sep" aria-hidden="true">:</div>
+        <div class="wheel-col" id="colMin" tabindex="0" role="spinbutton" aria-label="Minute"></div>
+        <div class="wheel-col" id="colPeriod" tabindex="0" role="spinbutton" aria-label="AM or PM"></div>
+      </div>
+    </div>
+
+    <button type="button" class="start-btn" id="startBtn">Start Break</button>
+
+    <label class="save-row">
+      <input type="checkbox" id="autoStopToggle" checked>
+      Stop the timer automatically when the break ends
+    </label>
+
+  </section>
+</main>
+
+<footer class="credits">
+  &copy; <span id="year">2026</span> <a class="footer-link" href="https://nourcode.com/" target="_blank" rel="noopener noreferrer">NourCode</a> | Rest well, return on time
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var STATE_KEY = 'breakCalc.state';
+  var MIN = 60 * 1000;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var durationInput = $('duration');
+  var chips = document.querySelectorAll('.chip');
+  var startBtn = $('startBtn');
+  var autoStopToggle = $('autoStopToggle');
+  var wheelEl = $('wheel');
+
+  // duration: minutes. start: ms when the break started, or null before one is started.
+  // stopped: ms when Stop was pressed, or null while the break is live.
+  var state = null;
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  // 12-hour clock for every displayed time, e.g. "5:42 PM".
+  function hhmm(ms) {
+    var d = new Date(ms), h = d.getHours();
+    return (h % 12 || 12) + ':' + pad(d.getMinutes()) + (h < 12 ? ' AM' : ' PM');
+  }
+
+  // ---------- Storage (guarded: may be blocked on file:// or in private mode) ----------
+  function readStore(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
+  function writeStore(key, val) { try { window.localStorage.setItem(key, val); } catch (e) {} }
+  function removeStore(key) { try { window.localStorage.removeItem(key); } catch (e) {} }
+
+  // The running break is always kept so a refresh doesn't lose it.
+  function save() {
+    writeStore(STATE_KEY, JSON.stringify(state));
+  }
+
+  function load() {
+    try {
+      var s = JSON.parse(readStore(STATE_KEY));
+      if (s && s.duration >= 1 && s.duration <= 120) {
+        var start = typeof s.start === 'number' ? s.start : null;
+        var stopped = start !== null && typeof s.stopped === 'number' ? s.stopped : null;
+        return { duration: s.duration, start: start, stopped: stopped };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ---------- Wheel picker ----------
+  function Wheel(el, labels, onChange) {
+    var self = this;
+    this.el = el;
+    this.labels = labels;
+    this.index = 0;
+    var timer = null;
+    labels.forEach(function (text, i) {
+      var item = document.createElement('div');
+      item.className = 'wheel-item';
+      item.textContent = text;
+      item.addEventListener('click', function () { self.set(i, true); onChange(true); });
+      el.appendChild(item);
+    });
+    el.addEventListener('scroll', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var i = Math.round(el.scrollTop / self.rowHeight());
+        if (i !== self.index) { self.mark(i); onChange(false); }
+      }, 90);
+    });
+    el.addEventListener('keydown', function (e) {
+      var step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      self.set(Math.max(0, Math.min(labels.length - 1, self.index + step)), true);
+      onChange(true);
+    });
+  }
+  Wheel.prototype.rowHeight = function () { return this.el.firstChild.offsetHeight || 36; };
+  Wheel.prototype.mark = function (i) {
+    var items = this.el.children;
+    if (items[this.index]) items[this.index].classList.remove('sel');
+    this.index = Math.max(0, Math.min(this.labels.length - 1, i));
+    items[this.index].classList.add('sel');
+    this.el.setAttribute('aria-valuetext', this.labels[this.index]);
+  };
+  Wheel.prototype.set = function (i, smooth) {
+    this.mark(i);
+    var top = this.index * this.rowHeight();
+    if (smooth && this.el.scrollTo) this.el.scrollTo({ top: top, behavior: 'smooth' });
+    else this.el.scrollTop = top;
+  };
+
+  function range(n, from, fmt) { var a = []; for (var i = 0; i < n; i++) a.push(fmt(i + from)); return a; }
+
+  // The wheel follows the clock until the user moves it.
+  var wheelTouched = false;
+  function onWheelChange(byUser) { if (byUser) wheelTouched = true; render(); }
+
+  var hourWheel = new Wheel($('colHour'), range(12, 1, String), onWheelChange);
+  var minWheel = new Wheel($('colMin'), range(60, 0, pad), onWheelChange);
+  var periodWheel = new Wheel($('colPeriod'), ['AM', 'PM'], onWheelChange);
+
+  ['touchstart', 'pointerdown', 'wheel', 'keydown'].forEach(function (ev) {
+    wheelEl.addEventListener(ev, function () { wheelTouched = true; }, { passive: true });
+  });
+
+  function setWheel(ms) {
+    var d = new Date(ms);
+    hourWheel.set((d.getHours() % 12 || 12) - 1);
+    minWheel.set(d.getMinutes());
+    periodWheel.set(d.getHours() < 12 ? 0 : 1);
+  }
+
+  function wheelTime() {
+    var h = (hourWheel.index + 1) % 12 + periodWheel.index * 12;
+    var m = minWheel.index;
+    var now = new Date();
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+    // Picked 11:50 PM just after midnight: the break started yesterday.
+    if (d.getTime() - now.getTime() > 12 * 60 * MIN) d.setDate(d.getDate() - 1);
+    return d.getTime();
+  }
+
+  // ---------- Rendering ----------
+  function fmtSecs(secs) {
+    var m = Math.floor(secs / 60), s = secs % 60;
+    return s ? m + 'm ' + s + 's' : m + ' min';
+  }
+  // Rounded so remaining + elapsed always add up to the full duration.
+  function fmtRemaining(ms) { return fmtSecs(Math.ceil(ms / 1000)); }
+  function fmtElapsed(ms) { return fmtSecs(Math.floor(ms / 1000)); }
+
+  var cardEl = document.querySelector('.card');
+  function setRunning(running, titleText) {
+    if (running && !cardEl.classList.contains('running')) {
+      // Start the seconds sweep where the break's current minute is, so it ticks in step.
+      var delay = '-' + (((Date.now() - state.start) / 1000) % 60).toFixed(2) + 's';
+      $('ringSec').style.webkitAnimationDelay = delay;
+      $('ringSec').style.animationDelay = delay;
+    }
+    cardEl.classList.toggle('running', running);
+    // Countdown in the tab title too, visible from the browser's tab switcher.
+    document.title = running ? titleText + ' · Break Timer' : 'Break Timer';
+  }
+
+  var lastMinute = -1;
+  // How long before the end the timer turns red, by planned duration (minutes):
+  // under 15 → last 20%; 15→3, 60→5, 90+→10, rising evenly in between.
+  function warnMs(minutes) {
+    var w;
+    if (minutes < 15) w = minutes * 0.2;
+    else if (minutes < 60) w = 3 + (minutes - 15) * 2 / 45;
+    else if (minutes < 90) w = 5 + (minutes - 60) * 5 / 30;
+    else w = 10;
+    return w * MIN;
+  }
+  var lastPhase = null; // 'ok' | 'warn' | 'over' for the live break, null otherwise
+
+  // ---------- Sounds (generated with Web Audio, so they work offline) ----------
+  var audioCtx = null;
+  function unlockAudio() {
+    // Browsers only allow sound after a real tap/click (touchstart and touch pointerdown don't count),
+    // so create/resume the audio engine only on events that grant that permission.
+    var ua = navigator.userActivation;
+    if (ua && !ua.isActive) return;
+    if (audioCtx && audioCtx.state === 'running') return;
+    try {
+      if (!audioCtx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) {}
+  }
+  ['click', 'pointerup', 'touchend', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, unlockAudio, true);
+  });
+
+  function tone(freq, startAt, length, volume, type) {
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    // Short fade in/out avoids clicks.
+    gain.gain.setValueAtTime(0, startAt);
+    gain.gain.linearRampToValueAtTime(volume, startAt + 0.02);
+    gain.gain.setValueAtTime(volume, startAt + length - 0.03);
+    gain.gain.linearRampToValueAtTime(0, startAt + length);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(startAt);
+    osc.stop(startAt + length);
+  }
+
+  // Warning: two short, soft beeps (~0.5 s).
+  function playWarning() {
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime + 0.05;
+    tone(880, t, 0.15, 0.3, 'sine');
+    tone(880, t + 0.25, 0.15, 0.3, 'sine');
+  }
+
+  // Break over: longer and louder alarm (~3 s of alternating tones).
+  function playEnd() {
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime + 0.05;
+    for (var i = 0; i < 10; i++) {
+      tone(i % 2 ? 740 : 988, t + i * 0.3, 0.25, 0.7, 'square');
+    }
+  }
+
+  function render() {
+    var now = Date.now();
+    var total = state.duration * MIN;
+
+    if (state.start === null) {
+      setRunning(false);
+      // No break yet: keep the wheel on the current time; times stay hidden until a break starts.
+      var minute = Math.floor(now / MIN);
+      if (!wheelTouched && minute !== lastMinute) { lastMinute = minute; setWheel(now); }
+      $('status').textContent = 'Ready to start';
+      $('tlStart').textContent = $('tlEnd').textContent = $('elapsed').textContent = '';
+      setProgress(0, total);
+      setButton('Start Break', false);
+      $('summary').hidden = true;
+      cardEl.classList.remove('warning');
+      lastPhase = null;
+      return;
+    }
+
+    // A stopped break is frozen at the moment Stop was pressed.
+    var stopped = state.stopped !== null;
+    var at = stopped ? state.stopped : now;
+    var end = state.start + total;
+    var elapsed = Math.max(0, Math.min(total, at - state.start));
+    var over = elapsed >= total;
+    $('status').textContent = stopped ? 'Break stopped' : over ? 'Break over' : (at < state.start ? 'Break not started yet' : 'On break');
+    $('tlStart').textContent = hhmm(state.start);
+    $('tlEnd').textContent = hhmm(end);
+    // Past the end the clock keeps counting: elapsed and percent go beyond the plan,
+    // and the ring center counts the overtime up.
+    var actual = Math.max(0, at - state.start);
+    var overMs = actual - total;
+    setProgress(elapsed / total * 100, total - elapsed);
+    $('elapsed').textContent = fmtElapsed(actual);
+    $('percent').textContent = Math.round(actual / total * 100) + '%';
+    if (overMs >= 1000) {
+      $('ringBig').textContent = '+' + fmtClock(overMs, true);
+      $('ringSmall').textContent = 'over';
+    }
+    setRunning(!stopped && at >= state.start, over ? '+' + fmtElapsed(overMs) + ' over' : fmtRemaining(total - elapsed));
+
+    // Red from the warning point until the break is stopped; beep on entering it, alarm at the end.
+    var live = !stopped && at >= state.start;
+    var warn = live && total - elapsed <= warnMs(state.duration);
+    cardEl.classList.toggle('warning', warn);
+    var phase = !live ? null : over ? 'over' : warn ? 'warn' : 'ok';
+    // Only a change seen while the page is open sounds; loading mid-phase stays quiet.
+    if (lastPhase && phase && phase !== lastPhase) {
+      if (phase === 'warn') playWarning();
+      else if (phase === 'over') playEnd();
+    }
+    lastPhase = phase;
+
+    // Auto-stop: end the break exactly at its end time, logging the planned duration.
+    if (live && over && autoStopToggle.checked) {
+      stopBreak(end);
+      render();
+      return;
+    }
+    // Safety net when auto-stop is off: a break left running to twice its length is
+    // stopped at that point, so a forgotten timer doesn't count overtime forever.
+    if (live && actual >= 2 * total) {
+      stopBreak(state.start + 2 * total);
+      render();
+      return;
+    }
+    setButton(stopped ? 'Start New Break' : 'Stop Break', !stopped);
+
+    $('summary').hidden = !stopped;
+    if (stopped) {
+      // Actual time away, not capped at the planned duration.
+      var taken = Math.max(0, state.stopped - state.start);
+      var extra = taken - total;
+      $('summary').textContent = 'You took ' + fmtElapsed(taken) +
+        (extra >= 1000 ? ' · ' + fmtElapsed(extra) + ' over' : ' of ' + state.duration + ' min') +
+        (taken === 2 * total ? ' · stopped automatically' : '');
+    }
+  }
+
+  function setButton(text, isStop) {
+    startBtn.textContent = text;
+    startBtn.classList.toggle('stop', isStop);
+  }
+
+  var RING_LEN = 2 * Math.PI * 96; // circumference of the progress circle (r=96)
+  var ringFill = $('ringFill');
+  ringFill.style.strokeDasharray = RING_LEN;
+  ringFill.style.strokeDashoffset = RING_LEN; // start empty, then fill to the current value
+
+  // Countdowns round up (never show 0:00 early); count-ups round down.
+  function fmtClock(ms, countUp) {
+    var secs = countUp ? Math.floor(ms / 1000) : Math.ceil(ms / 1000);
+    return Math.floor(secs / 60) + ':' + pad(secs % 60);
+  }
+
+  function setProgress(pct, remainingMs) {
+    ringFill.style.strokeDashoffset = RING_LEN * (1 - pct / 100);
+    var head = 'rotate(' + (pct * 3.6) + 'deg)';
+    $('ringHead').style.webkitTransform = head;
+    $('ringHead').style.transform = head;
+    $('ringBig').textContent = fmtClock(remainingMs);
+    $('ringSmall').textContent = 'remaining';
+    $('track').setAttribute('aria-valuenow', Math.round(pct));
+    // Percent shows only while a break exists, next to the elapsed time.
+    $('percent').textContent = state.start === null ? '' : Math.round(pct) + '%';
+  }
+
+  function stopBreak(at) {
+    state.stopped = at;
+    save();
+  }
+
+  function renderDuration() {
+    var v = state.duration;
+    durationInput.value = v;
+    $('durationValue').textContent = v + ' min';
+    durationInput.style.setProperty('--pct', ((v - 1) / 119 * 100) + '%');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle('active', +chips[i].getAttribute('data-min') === v);
+    }
+  }
+
+  function setDuration(v) {
+    state.duration = v;
+    renderDuration();
+    render();
+    save();
+  }
+
+  // ---------- Events ----------
+  startBtn.addEventListener('click', function () {
+    if (state.start !== null && state.stopped === null) {
+      stopBreak(Date.now());
+      render();
+      return;
+    }
+    // Untouched wheel means "now", to the second.
+    state.start = wheelTouched ? wheelTime() : Date.now();
+    state.stopped = null;
+    wheelTouched = true; // wheel now shows this break's start
+    setWheel(state.start);
+    render();
+    save();
+  });
+
+  $('nowBtn').addEventListener('click', function () {
+    // Back to "now": the wheel jumps to the clock and Start uses the exact current second.
+    wheelTouched = false;
+    lastMinute = Math.floor(Date.now() / MIN);
+    setWheel(Date.now());
+    render();
+  });
+
+  durationInput.addEventListener('input', function () { setDuration(parseInt(durationInput.value, 10)); });
+
+  for (var i = 0; i < chips.length; i++) {
+    chips[i].addEventListener('click', function () { setDuration(+this.getAttribute('data-min')); });
+  }
+
+  autoStopToggle.addEventListener('change', function () {
+    render();
+  });
+
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
+
+  // ---------- Init ----------
+  $('year').textContent = new Date().getFullYear();
+  // Auto-stop starts checked on every load; unchecking applies until the next refresh.
+  autoStopToggle.checked = true;
+  // Data saved by older versions (settings and the removed break history).
+  removeStore('breakCalc.save');
+  removeStore('breakCalc.autoStop');
+  removeStore('breakCalc.history');
+  // Only a break that is still running survives a refresh; otherwise start from the defaults.
+  var saved = load();
+  state = (saved && saved.start !== null && saved.stopped === null) ? saved : { duration: 15, start: null, stopped: null };
+  if (state.start !== null) { wheelTouched = true; setWheel(state.start); }
+  renderDuration();
+  render();
+  setInterval(render, 1000);
+})();
+</script>
+</body>
+</html>
