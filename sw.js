@@ -1,6 +1,6 @@
 // Offline support: keep the app's files cached so it opens without internet.
 // Bump VERSION whenever any of these files change, so phones pick up the update.
-var VERSION = 'break-timer-v4';
+var VERSION = 'break-timer-v5';
 var FILES = [
   './',
   './index.html',

@@ -67,10 +67,9 @@
     --accent-soft: #8fa8f5;
   }
 
-  .theme-btn {
+  .corner-btn {
     position: absolute;
     top: 12px;
-    left: 12px;
     width: 36px; height: 36px;
     display: -webkit-box; display: -webkit-flex; display: flex;
     -webkit-box-align: center; -webkit-align-items: center; align-items: center;
@@ -81,7 +80,10 @@
     -webkit-transition: -webkit-transform 0.1s, background-color 0.2s;
     transition: transform 0.1s, background-color 0.2s;
   }
-  .theme-btn:active { -webkit-transform: scale(0.92); transform: scale(0.92); background-color: var(--surface-press); }
+  .corner-btn.left { left: 12px; }
+  .corner-btn.right { right: 12px; }
+  .corner-btn[hidden] { display: none; }
+  .corner-btn:active { -webkit-transform: scale(0.92); transform: scale(0.92); background-color: var(--surface-press); }
   .theme-btn .icon-sun { display: none; }
   :root[data-theme="dark"] .theme-btn .icon-sun { display: block; }
   :root[data-theme="dark"] .theme-btn .icon-moon { display: none; }
@@ -453,7 +455,7 @@
   .install {
     position: fixed;
     left: 50%;
-    bottom: max(12px, env(safe-area-inset-bottom));
+    top: max(12px, env(safe-area-inset-top));
     z-index: 10;
     width: calc(100% - 32px);
     max-width: 400px;
@@ -470,8 +472,8 @@
     -webkit-animation: slideUp 0.35s ease-out; animation: slideUp 0.35s ease-out;
   }
   .install[hidden] { display: none; }
-  @-webkit-keyframes slideUp { from { -webkit-transform: translate(-50%, 120%); } to { -webkit-transform: translate(-50%, 0); } }
-  @keyframes slideUp { from { transform: translate(-50%, 120%); } to { transform: translate(-50%, 0); } }
+  @-webkit-keyframes slideUp { from { -webkit-transform: translate(-50%, -120%); } to { -webkit-transform: translate(-50%, 0); } }
+  @keyframes slideUp { from { transform: translate(-50%, -120%); } to { transform: translate(-50%, 0); } }
   .install img { width: 40px; height: 40px; -webkit-flex-shrink: 0; flex-shrink: 0; -webkit-border-radius: 10px; border-radius: 10px; }
   .install-text { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; font-size: 0.8rem; line-height: 1.35; color: var(--muted); }
   .install-text strong { display: block; font-size: 0.9rem; color: var(--text); }
@@ -499,8 +501,8 @@
     -webkit-border-radius: 50%; border-radius: 50%;
   }
   .install-close:active { background-color: var(--surface); }
-  /* Keep the footer reachable above the banner */
-  body.has-install { padding-bottom: 96px; }
+  /* Push the card down so the banner doesn't cover its top */
+  body.has-install { padding-top: calc(env(safe-area-inset-top) + 88px); }
 
   /* ---------- Credits ---------- */
   .credits {
@@ -521,7 +523,12 @@
 <body>
 <main class="card">
   <section class="panel" aria-label="Break status">
-    <button type="button" class="theme-btn" id="themeBtn" aria-label="Dark mode" aria-pressed="false">
+    <button type="button" class="corner-btn right" id="installCorner" aria-label="Install app" hidden>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 19h14"/>
+      </svg>
+    </button>
+    <button type="button" class="corner-btn left theme-btn" id="themeBtn" aria-label="Dark mode" aria-pressed="false">
       <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
       </svg>
@@ -1038,7 +1045,8 @@
   // ---------- Install banner ----------
   // Android/desktop Chrome: our own Install button triggers the browser's install dialog.
   // iPhone/iPad: there is no install API, so the banner explains Share → Add to Home Screen.
-  // Hidden once installed, and for a week after the user closes it.
+  // Hidden once installed, and for a week after the user closes it. The install button in the
+  // top-right corner stays available (until installed) to bring it back on demand.
   var INSTALL_DISMISS_KEY = 'breakCalc.installDismissed';
   var installBar = $('installBar');
   var installEvent = null;
@@ -1049,8 +1057,12 @@
     var t = +readStore(INSTALL_DISMISS_KEY);
     return t && Date.now() - t < 7 * 24 * 60 * MIN;
   }
-  function showInstall(mode) {
-    if (isInstalled || dismissedRecently()) return;
+  var canInstall = /^https?:$/.test(location.protocol);
+  function updateInstallCorner() {
+    $('installCorner').hidden = !canInstall || isInstalled || !(installEvent || isIOS);
+  }
+  function showInstall(mode, force) {
+    if (isInstalled || (!force && dismissedRecently())) return;
     $('installBtn').hidden = mode !== 'prompt';
     if (mode !== 'ios') {
       $('installHint').textContent = 'Opens like an app and works offline.';
@@ -1064,28 +1076,39 @@
     installBar.hidden = true;
     document.body.classList.remove('has-install');
   }
-  if (/^https?:$/.test(location.protocol)) {
+  if (canInstall) {
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault(); // show our banner instead of the browser's default one
       installEvent = e;
       showInstall('prompt');
+      updateInstallCorner();
     });
     if (isIOS) showInstall('ios');
   }
-  $('installBtn').addEventListener('click', function () {
+  function promptInstall() {
     if (!installEvent) return;
     installEvent.prompt();
     installEvent.userChoice.then(function (choice) {
-      installEvent = null;
+      installEvent = null; // the browser offers it again later if still not installed
       hideInstall();
+      updateInstallCorner();
       if (choice.outcome !== 'accepted') writeStore(INSTALL_DISMISS_KEY, String(Date.now()));
     });
+  }
+  $('installBtn').addEventListener('click', promptInstall);
+  $('installCorner').addEventListener('click', function () {
+    if (installEvent) promptInstall();
+    else if (isIOS) { // iPhone: show the Share → Add to Home Screen steps
+      showInstall('ios', true);
+      window.scrollTo(0, 0);
+    }
   });
+  updateInstallCorner();
   $('installClose').addEventListener('click', function () {
     hideInstall();
     writeStore(INSTALL_DISMISS_KEY, String(Date.now()));
   });
-  window.addEventListener('appinstalled', function () { isInstalled = true; hideInstall(); });
+  window.addEventListener('appinstalled', function () { isInstalled = true; hideInstall(); updateInstallCorner(); });
 
   // Offline + installable: service workers only run over http(s), not when opened as a file.
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
