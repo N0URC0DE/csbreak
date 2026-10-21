@@ -861,11 +861,16 @@
     var now = Date.now();
     var total = state.duration * MIN;
 
+    // With no live break (none yet, or the last one stopped) the wheel follows the clock,
+    // so the next Start begins now unless the user picks another time.
+    if ((state.start === null || state.stopped !== null) && !wheelTouched) {
+      var minute = Math.floor(now / MIN);
+      if (minute !== lastMinute) { lastMinute = minute; setWheel(now); }
+    }
+
     if (state.start === null) {
       setRunning(false);
-      // No break yet: keep the wheel on the current time; times stay hidden until a break starts.
-      var minute = Math.floor(now / MIN);
-      if (!wheelTouched && minute !== lastMinute) { lastMinute = minute; setWheel(now); }
+      // Times stay hidden until a break starts.
       $('status').textContent = 'Ready to start';
       $('tlStart').textContent = $('tlEnd').textContent = $('elapsed').textContent = '';
       setProgress(0, total);
@@ -968,6 +973,9 @@
   function stopBreak(at) {
     state.stopped = at;
     save();
+    // Release the wheel from this break's start time so a new break doesn't reuse it.
+    wheelTouched = false;
+    lastMinute = -1;
   }
 
   function renderDuration() {
