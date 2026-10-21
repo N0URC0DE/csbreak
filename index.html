@@ -82,6 +82,7 @@
   }
   .corner-btn.left { left: 12px; }
   .corner-btn.right { right: 12px; }
+  .corner-btn.left2 { left: 56px; }
   .corner-btn[hidden] { display: none; }
   .corner-btn:active { -webkit-transform: scale(0.92); transform: scale(0.92); background-color: var(--surface-press); }
   .theme-btn .icon-sun { display: none; }
@@ -470,6 +471,60 @@
     cursor: pointer;
   }
 
+  /* ---------- Walkthrough ---------- */
+  .tour { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 20; }
+  .tour[hidden] { display: none; }
+  /* The spotlight: a rounded hole, everything around it dimmed by a huge shadow */
+  .tour-spot {
+    position: absolute;
+    -webkit-border-radius: 16px; border-radius: 16px;
+    -webkit-box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.62);
+    box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.62);
+    -webkit-transition: top 0.25s, left 0.25s, width 0.25s, height 0.25s;
+    transition: top 0.25s, left 0.25s, width 0.25s, height 0.25s;
+    pointer-events: none;
+  }
+  .tour-card {
+    position: absolute;
+    left: 16px; right: 16px;
+    max-width: 360px;
+    margin: 0 auto;
+    padding: 16px 16px 12px;
+    color: var(--text);
+    background-color: var(--card-bg);
+    -webkit-border-radius: 18px; border-radius: 18px;
+    -webkit-box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    -webkit-transition: top 0.25s; transition: top 0.25s;
+  }
+  .tour-step { font-size: 0.75rem; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; }
+  .tour-title { margin-top: 4px; font-size: 1.05rem; font-weight: 800; }
+  .tour-text { margin-top: 6px; font-size: 0.9rem; line-height: 1.45; color: var(--muted); }
+  .tour-actions {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .tour-spacer { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; }
+  .tour-skip, .tour-back {
+    height: 36px; padding: 0 12px;
+    font-size: 0.9rem; font-weight: 700;
+    color: var(--muted);
+    background-color: transparent;
+    -webkit-border-radius: 18px; border-radius: 18px;
+  }
+  .tour-back { color: var(--text); background-color: var(--surface); }
+  .tour-back[hidden] { display: none; }
+  .tour-next {
+    height: 36px; padding: 0 18px;
+    font-size: 0.9rem; font-weight: 700;
+    color: #ffffff;
+    background-color: var(--accent);
+    -webkit-border-radius: 18px; border-radius: 18px;
+  }
+  .tour-next:active { background-color: var(--accent-press); }
+
   /* ---------- Install banner ---------- */
   .install {
     position: fixed;
@@ -545,6 +600,11 @@
         <path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 19h14"/>
       </svg>
     </button>
+    <button type="button" class="corner-btn left2" id="helpBtn" aria-label="How it works">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17.2" r="0.6" fill="currentColor"/>
+      </svg>
+    </button>
     <button type="button" class="corner-btn left theme-btn" id="themeBtn" aria-label="Dark mode" aria-pressed="false">
       <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
@@ -581,7 +641,7 @@
   </section>
 
   <section class="controls">
-    <div>
+    <div id="quickBlock">
       <span class="ctl-label" id="chipsLabel">Quick durations</span>
       <div class="chips" role="group" aria-labelledby="chipsLabel">
         <button type="button" class="chip" data-min="15">15 min</button>
@@ -591,7 +651,7 @@
       </div>
     </div>
 
-    <div class="slider-block">
+    <div class="slider-block" id="sliderBlock">
       <label class="ctl-label" for="duration">Exact break duration</label>
       <div class="slider-row">
         <input type="range" id="duration" min="1" max="120" step="1" value="15">
@@ -599,7 +659,7 @@
       </div>
     </div>
 
-    <div class="time-block">
+    <div class="time-block" id="timeBlock">
       <div class="label-row">
         <span class="ctl-label" id="wheelLabel">Break start time</span>
         <button type="button" class="now-btn" id="nowBtn" aria-label="Set start time to now">
@@ -617,12 +677,12 @@
       </div>
     </div>
 
-    <div class="action-row">
+    <div class="action-row" id="actionRow">
       <button type="button" class="start-btn" id="startBtn">Start Break</button>
       <button type="button" class="cancel-btn" id="cancelBtn" hidden>Cancel</button>
     </div>
 
-    <label class="save-row">
+    <label class="save-row" id="autoStopRow">
       <input type="checkbox" id="autoStopToggle" checked>
       Auto-stop when the break ends
     </label>
@@ -640,6 +700,21 @@
   <button type="button" class="install-close" id="installClose" aria-label="Dismiss">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
   </button>
+</div>
+
+<div class="tour" id="tour" hidden>
+  <div class="tour-spot" id="tourSpot"></div>
+  <div class="tour-card" id="tourCard" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourText">
+    <div class="tour-step" id="tourStep"></div>
+    <h2 class="tour-title" id="tourTitle"></h2>
+    <p class="tour-text" id="tourText"></p>
+    <div class="tour-actions">
+      <button type="button" class="tour-skip" id="tourSkip">Skip</button>
+      <span class="tour-spacer"></span>
+      <button type="button" class="tour-back" id="tourBack">Back</button>
+      <button type="button" class="tour-next" id="tourNext">Next</button>
+    </div>
+  </div>
 </div>
 
 <footer class="credits">
@@ -1083,6 +1158,101 @@
   render();
   setInterval(render, 1000);
 
+  // ---------- Walkthrough ----------
+  // Spotlights one part of the screen at a time with a short explanation. Opens by itself on the
+  // first visit; the ? button replays it. Steps whose target is hidden (e.g. install) are skipped.
+  var TOUR_KEY = 'breakCalc.tourDone';
+  var TOUR_STEPS = [
+    { targets: ['quickBlock', 'sliderBlock'], title: 'Pick your break length',
+      text: 'Tap a quick option, or slide for an exact number of minutes.' },
+    { targets: ['timeBlock'], title: 'When did it start?',
+      text: 'The wheel follows the clock, so you can just start now. Took your break a bit earlier? Scroll to that time. Now jumps back to the current time.' },
+    { targets: ['actionRow'], title: 'Start your break',
+      text: 'Tap Start Break. While it runs, Stop Break ends it and tells you how long you took; Cancel throws it away.' },
+    { targets: ['track'], title: 'Watch the countdown',
+      text: 'It turns red with a beep when you are almost out of time, and an alarm rings when it ends.' },
+    { targets: ['autoStopRow'], title: 'Auto-stop',
+      text: 'On: the timer stops by itself at the end. Off: it keeps counting so you see how late you are.' },
+    { targets: ['themeBtn', 'helpBtn', 'installCorner'], title: 'Up top',
+      text: 'Switch light and dark mode, replay this guide with ?, and add the app to your home screen to open it like any app, even offline.' }
+  ];
+  var tourIndex = 0;
+  var tourSteps = [];
+
+  function visible(el) { return el && !el.hidden && el.offsetParent !== null; }
+
+  function tourRect(step) {
+    var r = null;
+    step.targets.forEach(function (id) {
+      var el = $(id);
+      if (!visible(el)) return;
+      var b = el.getBoundingClientRect();
+      r = r ? { top: Math.min(r.top, b.top), left: Math.min(r.left, b.left), bottom: Math.max(r.bottom, b.bottom), right: Math.max(r.right, b.right) }
+            : { top: b.top, left: b.left, bottom: b.bottom, right: b.right };
+    });
+    return r;
+  }
+
+  function placeTour() {
+    var step = tourSteps[tourIndex];
+    var r = tourRect(step);
+    var pad = 8;
+    var spot = $('tourSpot');
+    spot.style.top = (r.top - pad) + 'px';
+    spot.style.left = (r.left - pad) + 'px';
+    spot.style.width = (r.right - r.left + pad * 2) + 'px';
+    spot.style.height = (r.bottom - r.top + pad * 2) + 'px';
+    // Card below the spotlight if it fits, otherwise above it.
+    var card = $('tourCard');
+    var h = card.offsetHeight;
+    var below = r.bottom + pad + 12;
+    card.style.top = (below + h <= window.innerHeight - 12 ? below : Math.max(12, r.top - pad - 12 - h)) + 'px';
+  }
+
+  function showTourStep(i) {
+    tourIndex = i;
+    var step = tourSteps[i];
+    $('tourStep').textContent = (i + 1) + ' / ' + tourSteps.length;
+    $('tourTitle').textContent = step.title;
+    $('tourText').textContent = step.text;
+    $('tourBack').hidden = i === 0;
+    $('tourNext').textContent = i === tourSteps.length - 1 ? 'Done' : 'Next';
+    // Bring the part into view first, then measure where it landed.
+    $(step.targets.filter(function (id) { return visible($(id)); })[0]).scrollIntoView({ block: 'center' });
+    placeTour();
+    $('tourNext').focus();
+  }
+
+  function startTour() {
+    tourSteps = TOUR_STEPS.filter(function (s) { return tourRect(s); });
+    if (!tourSteps.length) return;
+    hideInstall();
+    $('tour').hidden = false;
+    showTourStep(0);
+  }
+
+  function endTour() {
+    $('tour').hidden = true;
+    writeStore(TOUR_KEY, '1');
+    window.scrollTo(0, 0);
+    $('helpBtn').focus();
+  }
+
+  $('helpBtn').addEventListener('click', startTour);
+  $('tourNext').addEventListener('click', function () {
+    if (tourIndex < tourSteps.length - 1) showTourStep(tourIndex + 1);
+    else endTour();
+  });
+  $('tourBack').addEventListener('click', function () { if (tourIndex > 0) showTourStep(tourIndex - 1); });
+  $('tourSkip').addEventListener('click', endTour);
+  document.addEventListener('keydown', function (e) {
+    if ($('tour').hidden) return;
+    if (e.key === 'Escape') endTour();
+    else if (e.key === 'ArrowRight') $('tourNext').click();
+    else if (e.key === 'ArrowLeft') $('tourBack').click();
+  });
+  window.addEventListener('resize', function () { if (!$('tour').hidden) placeTour(); });
+
   // ---------- Install banner ----------
   // Android/desktop Chrome: our own Install button triggers the browser's install dialog.
   // iPhone/iPad: there is no install API, so the banner explains Share → Add to Home Screen.
@@ -1147,6 +1317,8 @@
   updateInstallCorner();
   $('installClose').addEventListener('click', hideInstall);
   window.addEventListener('appinstalled', function () { isInstalled = true; hideInstall(); updateInstallCorner(); });
+
+  if (!readStore(TOUR_KEY)) setTimeout(startTour, 400);
 
   // Offline + installable: service workers only run over http(s), not when opened as a file.
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
