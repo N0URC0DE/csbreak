@@ -1,1 +1,6 @@
 .DS_Store
+
+# Push server: dependencies, local state and the local VAPID private key
+push-server/node_modules/
+push-server/.wrangler/
+push-server/.dev.vars

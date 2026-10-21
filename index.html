@@ -464,6 +464,8 @@
     color: var(--muted);
     cursor: pointer;
   }
+  .save-row.notify-row { margin-top: 0; padding-top: 10px; }
+  .save-row[hidden] { display: none; }
   .save-row input {
     width: 20px; height: 20px;
     -webkit-flex-shrink: 0; flex-shrink: 0;
@@ -691,6 +693,10 @@
     <label class="save-row" id="autoStopRow">
       <input type="checkbox" id="autoStopToggle" checked>
       Auto-stop when the break ends
+    </label>
+    <label class="save-row notify-row" id="notifyRow" hidden>
+      <input type="checkbox" id="notifyToggle" checked>
+      <span id="notifyLabel">Notify me when it ends, even with the screen off</span>
     </label>
 
   </section>
@@ -1060,6 +1066,7 @@
   function stopBreak(at) {
     state.stopped = at;
     save();
+    cancelEndNotification();
     // Release the wheel from this break's start time so a new break doesn't reuse it.
     wheelTouched = false;
     lastMinute = -1;
@@ -1080,6 +1087,7 @@
     renderDuration();
     render();
     save();
+    if (state.start !== null && state.stopped === null) scheduleEndNotification(false); // new end time
   }
 
   // ---------- Events ----------
@@ -1097,11 +1105,13 @@
     setWheel(state.start);
     render();
     save();
+    scheduleEndNotification(true); // inside the tap, so the permission prompt is allowed
     tourAfterAction();
   });
 
   // Cancel: throw the current break away (no summary) and go back to the defaults screen.
   function clearBreak() {
+    cancelEndNotification();
     state.start = null;
     state.stopped = null;
     wheelTouched = false; // wheel follows the clock again
@@ -1132,6 +1142,96 @@
   autoStopToggle.addEventListener('change', function () {
     render();
   });
+
+  // ---------- End-of-break notification ----------
+  // The phone stops web apps in the background, so the push server (push-server/, a Cloudflare
+  // Worker) sends a notification at the break's end time. Start schedules it, Stop/Cancel cancel
+  // it; a quiet "On break until …" notification sits in the shade meanwhile.
+  var PUSH_SERVER = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+    ? 'http://127.0.0.1:8790' : 'https://csbreak-push.m-abonnoor.workers.dev';
+  var VAPID_PUBLIC_KEY = 'BMpcScvPYzzA2iQYjGFQ6oDrSrLrTScFlY8kdpjH7T_H5mOCaRB1GeZ1nbXH62QvX4MD4TpZrlG1SR5biV6k-o0';
+  var pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window &&
+    /^https?:$/.test(location.protocol);
+  var notifyToggle = $('notifyToggle');
+
+  function deviceId() {
+    var id = readStore('breakCalc.deviceId');
+    if (!id) {
+      var bytes = crypto.getRandomValues(new Uint8Array(18));
+      id = btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      writeStore('breakCalc.deviceId', id);
+    }
+    return id;
+  }
+
+  function b64urlToBytes(str) {
+    var bin = atob(str.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((str.length + 3) % 4));
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function updateNotifyRow() {
+    $('notifyRow').hidden = !pushSupported;
+    if (!pushSupported) return;
+    var blocked = Notification.permission === 'denied';
+    notifyToggle.disabled = blocked;
+    if (blocked) notifyToggle.checked = false;
+    $('notifyLabel').textContent = blocked
+      ? 'Notifications are blocked for this site in your phone settings'
+      : 'Notify me when it ends, even with the screen off';
+  }
+
+  function closeBreakNotifications() {
+    if (!pushSupported) return;
+    navigator.serviceWorker.ready.then(function (reg) {
+      return reg.getNotifications({ tag: 'break' });
+    }).then(function (list) { list.forEach(function (n) { n.close(); }); }).catch(function () {});
+  }
+
+  // allowPrompt: true only when called straight from a tap (browsers ignore prompts otherwise).
+  function scheduleEndNotification(allowPrompt) {
+    if (!pushSupported || !notifyToggle.checked || !$('tour').hidden) return; // the tour's practice break stays local
+    if (state.start === null || state.stopped !== null) return;
+    var endAt = state.start + state.duration * MIN;
+    if (endAt <= Date.now() + 1000) return;
+    var perm = Notification.permission === 'default' && allowPrompt
+      ? Notification.requestPermission() : Promise.resolve(Notification.permission);
+    Promise.resolve(perm).then(function (p) {
+      updateNotifyRow();
+      if (p !== 'granted') return;
+      return navigator.serviceWorker.ready.then(function (reg) {
+        return reg.pushManager.getSubscription().then(function (sub) {
+          return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(VAPID_PUBLIC_KEY) });
+        }).then(function (sub) {
+          reg.showNotification('On break until ' + hhmm(endAt), {
+            tag: 'break', silent: true, icon: 'icons/icon-192.png',
+            body: "We'll let you know when it's time to head back."
+          });
+          return fetch(PUSH_SERVER + '/schedule', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: deviceId(), subscription: sub.toJSON(), endAt: endAt,
+              title: "Break's over ☕", body: 'Time to head back to your desk.' })
+          });
+        });
+      });
+    }).catch(function () {}); // no network or no push support: the in-app alarm still works when open
+  }
+
+  function cancelEndNotification() {
+    if (!pushSupported || !readStore('breakCalc.deviceId')) return;
+    closeBreakNotifications();
+    fetch(PUSH_SERVER + '/cancel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ id: deviceId() })
+    }).catch(function () {});
+  }
+
+  notifyToggle.addEventListener('change', function () {
+    if (notifyToggle.checked) scheduleEndNotification(true);
+    else cancelEndNotification();
+  });
+  updateNotifyRow();
 
   document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
 
