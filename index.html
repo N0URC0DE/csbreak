@@ -1266,7 +1266,10 @@
     var card = $('tourCard');
     var ch = card.offsetHeight;
     var below = t + h + 12;
-    card.style.top = (below + ch <= H - 12 ? below : Math.max(12, t - 12 - ch)) + 'px';
+    var cardBelow = below + ch <= H - 12;
+    card.style.top = (cardBelow ? below : Math.max(12, t - 12 - ch)) + 'px';
+    // Point the hint at the button: up when the card sits under it, down when above.
+    $('tourHint').textContent = 'Tap the highlighted button ' + (cardBelow ? '👆' : '👇');
   }
 
   function showTourStep(i) {
