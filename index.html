@@ -472,7 +472,10 @@
   }
 
   /* ---------- Walkthrough ---------- */
-  .tour { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 20; }
+  .tour { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 20; pointer-events: none; }
+  /* Invisible tap blockers around the spotlight; the hole one is removed on "tap this" steps */
+  .tour-block { position: absolute; pointer-events: auto; }
+  .tour-block[hidden] { display: none; }
   .tour[hidden] { display: none; }
   /* The spotlight: a rounded hole, everything around it dimmed by a huge shadow */
   .tour-spot {
@@ -486,6 +489,7 @@
   }
   .tour-card {
     position: absolute;
+    pointer-events: auto;
     left: 16px; right: 16px;
     max-width: 360px;
     margin: 0 auto;
@@ -515,7 +519,9 @@
     -webkit-border-radius: 18px; border-radius: 18px;
   }
   .tour-back { color: var(--text); background-color: var(--surface); }
-  .tour-back[hidden] { display: none; }
+  .tour-back[hidden], .tour-next[hidden] { display: none; }
+  .tour-hint { font-size: 0.85rem; font-weight: 700; color: var(--accent); }
+  .tour-hint[hidden] { display: none; }
   .tour-next {
     height: 36px; padding: 0 18px;
     font-size: 0.9rem; font-weight: 700;
@@ -614,7 +620,7 @@
         <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
       </svg>
     </button>
-    <div class="status-row">
+    <div class="status-row" id="statusRow">
       <span class="live-dot" aria-hidden="true"></span>
       <h1 class="status" id="status" role="status" aria-live="polite">Ready to start</h1>
     </div>
@@ -633,7 +639,7 @@
         <div class="ring-small" id="ringSmall">remaining</div>
       </div>
     </div>
-    <div class="ring-times">
+    <div class="ring-times" id="ringTimes">
       <div><div class="tl-label">Start</div><div class="tl-time" id="tlStart"></div></div>
       <div><div class="tl-label">Elapsed</div><div class="tl-time"><span id="elapsed"></span> <span class="tl-pct" id="percent"></span></div></div>
       <div><div class="tl-label">End</div><div class="tl-time" id="tlEnd"></div></div>
@@ -703,6 +709,11 @@
 </div>
 
 <div class="tour" id="tour" hidden>
+  <div class="tour-block" id="tourBlockTop"></div>
+  <div class="tour-block" id="tourBlockBottom"></div>
+  <div class="tour-block" id="tourBlockLeft"></div>
+  <div class="tour-block" id="tourBlockRight"></div>
+  <div class="tour-block" id="tourBlockHole"></div>
   <div class="tour-spot" id="tourSpot"></div>
   <div class="tour-card" id="tourCard" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourText">
     <div class="tour-step" id="tourStep"></div>
@@ -711,6 +722,7 @@
     <div class="tour-actions">
       <button type="button" class="tour-skip" id="tourSkip">Skip</button>
       <span class="tour-spacer"></span>
+      <span class="tour-hint" id="tourHint" hidden>Tap the highlighted button 👆</span>
       <button type="button" class="tour-back" id="tourBack">Back</button>
       <button type="button" class="tour-next" id="tourNext">Next</button>
     </div>
@@ -1011,7 +1023,7 @@
       var taken = Math.max(0, state.stopped - state.start);
       var extra = taken - total;
       $('summary').textContent = 'You took ' + fmtElapsed(taken) +
-        (extra >= 1000 ? ' · ' + fmtElapsed(extra) + ' over' : ' of ' + state.duration + ' min') +
+        (extra >= 1000 ? ' · ' + fmtElapsed(extra) + ' over' : ' · ' + fmtRemaining(total - taken) + ' left') +
         (taken === 2 * total ? ' · stopped automatically' : '');
     }
   }
@@ -1075,6 +1087,7 @@
     if (state.start !== null && state.stopped === null) {
       stopBreak(Date.now());
       render();
+      tourAfterAction();
       return;
     }
     // Untouched wheel means "now", to the second.
@@ -1084,18 +1097,22 @@
     setWheel(state.start);
     render();
     save();
+    tourAfterAction();
   });
 
   // Cancel: throw the current break away (no summary) and go back to the defaults screen.
-  $('cancelBtn').addEventListener('click', function () {
-    var running = state.start !== null && state.stopped === null;
-    if (running && !window.confirm('Cancel this break? The timer will be cleared.')) return;
+  function clearBreak() {
     state.start = null;
     state.stopped = null;
     wheelTouched = false; // wheel follows the clock again
     lastMinute = -1;
     save();
     render();
+  }
+  $('cancelBtn').addEventListener('click', function () {
+    var running = state.start !== null && state.stopped === null;
+    if (running && !window.confirm('Cancel this break? The timer will be cleared.')) return;
+    clearBreak();
   });
 
   $('nowBtn').addEventListener('click', function () {
@@ -1159,25 +1176,52 @@
   setInterval(render, 1000);
 
   // ---------- Walkthrough ----------
-  // Spotlights one part of the screen at a time with a short explanation. Opens by itself on the
-  // first visit; the ? button replays it. Steps whose target is hidden (e.g. install) are skipped.
+  // Spotlights one part of the screen at a time. On a fresh screen it is hands-on: the user taps
+  // Start Break and Stop Break themselves (that practice break is cleared at the end). Opens on the
+  // first visit; the ? button replays it. Steps whose target isn't on screen are skipped.
   var TOUR_KEY = 'breakCalc.tourDone';
-  var TOUR_STEPS = [
-    { targets: ['quickBlock', 'sliderBlock'], title: 'Pick your break length',
-      text: 'Tap a quick option, or slide for an exact number of minutes.' },
-    { targets: ['timeBlock'], title: 'When did it start?',
-      text: 'The wheel follows the clock, so you can just start now. Took your break a bit earlier? Scroll to that time. Now jumps back to the current time.' },
-    { targets: ['actionRow'], title: 'Start your break',
-      text: 'Tap Start Break. While it runs, Stop Break ends it and tells you how long you took; Cancel throws it away.' },
-    { targets: ['track'], title: 'Watch the countdown',
-      text: 'It turns red with a beep when you are almost out of time, and an alarm rings when it ends.' },
-    { targets: ['autoStopRow'], title: 'Auto-stop',
-      text: 'On: the timer stops by itself at the end. Off: it keeps counting so you see how late you are.' },
-    { targets: ['themeBtn', 'helpBtn', 'installCorner'], title: 'Up top',
-      text: 'Switch light and dark mode, replay this guide with ?, and add the app to your home screen to open it like any app, even offline.' }
-  ];
+  var INSTALL_TEXT_IOS = 'Tap ⬇ for the steps: in Safari, Share → Add to Home Screen. Then it opens like an app and works with no internet.';
+  var INSTALL_TEXT = 'Tap ⬇ to add it to your home screen. It opens like an app, and once installed it works with no internet.';
   var tourIndex = 0;
   var tourSteps = [];
+  var tourPractice = false; // the tour started a break that should be cleared at the end
+
+  function buildTourSteps() {
+    var hands = state.start === null; // only walk through start/stop on a clean screen
+    var steps = [
+      { targets: ['quickBlock', 'sliderBlock'], title: 'Pick your break length',
+        text: 'Tap a quick option, or slide for an exact number of minutes.' },
+      { targets: ['timeBlock'], title: 'When did it start?',
+        text: 'The wheel follows the clock, so you can just start now. Took your break a bit earlier? Scroll to that time. Now jumps back to the current time.' }
+    ];
+    if (hands) {
+      steps.push(
+        { targets: ['startBtn'], waitFor: 'start', title: 'Try it: start a break',
+          text: 'Tap Start Break to see it in action.' },
+        { targets: ['track', 'ringTimes'], noBack: true, title: 'It\'s counting down',
+          text: 'Watch the seconds tick. It turns red with a beep when you\'re almost out of time, and an alarm rings when it ends.' },
+        { targets: ['startBtn'], waitFor: 'stop', noBack: true, title: 'Now stop it',
+          text: 'Back at your desk? Tap Stop Break.' },
+        { targets: ['statusRow', 'summary', 'track'], noBack: true, title: 'Stopped',
+          text: 'It shows how long you took and how much time was left. Start New Break begins a fresh one, and Cancel clears it.' });
+    } else {
+      steps.push(
+        { targets: ['actionRow'], title: 'Start and stop',
+          text: 'Start Break starts the timer. While it runs, Stop Break ends it and tells you how long you took; Cancel throws it away.' },
+        { targets: ['track'], title: 'Watch the countdown',
+          text: 'It turns red with a beep when you\'re almost out of time, and an alarm rings when it ends.' });
+    }
+    steps.push(
+      { targets: ['autoStopRow'], title: 'Auto-stop',
+        text: 'On: the timer stops by itself at the end. Off: it keeps counting so you see how late you are.' },
+      { targets: ['themeBtn', 'helpBtn'], title: 'Light or dark',
+        text: 'Switch between light and dark mode, and replay this guide anytime with ?.' },
+      { targets: ['installCorner'], always: true, title: 'Install it, use it offline',
+        text: isInstalled ? 'You\'ve installed it, so it opens from your home screen and works with no internet.'
+          : !$('installCorner').hidden ? (isIOS ? INSTALL_TEXT_IOS : INSTALL_TEXT)
+          : 'Add it to your home screen from your browser menu (Add to Home screen / Install app). It opens like an app and works with no internet.' });
+    return steps.filter(function (st) { return st.always || tourRect(st); });
+  }
 
   function visible(el) { return el && !el.hidden && el.offsetParent !== null; }
 
@@ -1193,20 +1237,36 @@
     return r;
   }
 
+  function placeBox(id, top, left, width, height) {
+    var st = $(id).style;
+    st.top = top + 'px'; st.left = left + 'px';
+    st.width = Math.max(0, width) + 'px'; st.height = Math.max(0, height) + 'px';
+  }
+
   function placeTour() {
     var step = tourSteps[tourIndex];
     var r = tourRect(step);
-    var pad = 8;
-    var spot = $('tourSpot');
-    spot.style.top = (r.top - pad) + 'px';
-    spot.style.left = (r.left - pad) + 'px';
-    spot.style.width = (r.right - r.left + pad * 2) + 'px';
-    spot.style.height = (r.bottom - r.top + pad * 2) + 'px';
+    var pad = 8, W = window.innerWidth, H = window.innerHeight;
+    if (!r) {
+      // Nothing to point at: dim everything and center the card.
+      placeBox('tourSpot', H / 2, W / 2, 0, 0);
+      placeBox('tourBlockTop', 0, 0, W, H);
+      ['tourBlockBottom', 'tourBlockLeft', 'tourBlockRight', 'tourBlockHole'].forEach(function (id) { placeBox(id, 0, 0, 0, 0); });
+      $('tourCard').style.top = Math.max(12, (H - $('tourCard').offsetHeight) / 2) + 'px';
+      return;
+    }
+    var t = r.top - pad, l = r.left - pad, w = r.right - r.left + pad * 2, h = r.bottom - r.top + pad * 2;
+    placeBox('tourSpot', t, l, w, h);
+    placeBox('tourBlockTop', 0, 0, W, t);
+    placeBox('tourBlockBottom', t + h, 0, W, H - t - h);
+    placeBox('tourBlockLeft', t, 0, l, h);
+    placeBox('tourBlockRight', t, l + w, W - l - w, h);
+    placeBox('tourBlockHole', t, l, w, h);
     // Card below the spotlight if it fits, otherwise above it.
     var card = $('tourCard');
-    var h = card.offsetHeight;
-    var below = r.bottom + pad + 12;
-    card.style.top = (below + h <= window.innerHeight - 12 ? below : Math.max(12, r.top - pad - 12 - h)) + 'px';
+    var ch = card.offsetHeight;
+    var below = t + h + 12;
+    card.style.top = (below + ch <= H - 12 ? below : Math.max(12, t - 12 - ch)) + 'px';
   }
 
   function showTourStep(i) {
@@ -1215,17 +1275,31 @@
     $('tourStep').textContent = (i + 1) + ' / ' + tourSteps.length;
     $('tourTitle').textContent = step.title;
     $('tourText').textContent = step.text;
-    $('tourBack').hidden = i === 0;
+    $('tourBack').hidden = i === 0 || !!step.noBack || !!step.waitFor;
+    $('tourNext').hidden = !!step.waitFor;         // hands-on steps advance when the user taps the button
+    $('tourHint').hidden = !step.waitFor;
+    $('tourBlockHole').hidden = !!step.waitFor;     // hands-on steps: let taps through to the highlighted button
     $('tourNext').textContent = i === tourSteps.length - 1 ? 'Done' : 'Next';
     // Bring the part into view first, then measure where it landed.
-    $(step.targets.filter(function (id) { return visible($(id)); })[0]).scrollIntoView({ block: 'center' });
+    var first = step.targets.filter(function (id) { return visible($(id)); })[0];
+    if (first) $(first).scrollIntoView({ block: 'center' });
     placeTour();
-    $('tourNext').focus();
+    (step.waitFor ? $(step.targets[0]) : $('tourNext')).focus();
+  }
+
+  // Called after Start/Stop; moves a hands-on step forward once the user did what it asked.
+  function tourAfterAction() {
+    if ($('tour').hidden) return;
+    var step = tourSteps[tourIndex];
+    var running = state.start !== null && state.stopped === null;
+    if (step.waitFor === 'start' && running) { tourPractice = true; showTourStep(tourIndex + 1); }
+    else if (step.waitFor === 'stop' && !running) showTourStep(tourIndex + 1);
   }
 
   function startTour() {
-    tourSteps = TOUR_STEPS.filter(function (s) { return tourRect(s); });
+    tourSteps = buildTourSteps();
     if (!tourSteps.length) return;
+    tourPractice = false;
     hideInstall();
     $('tour').hidden = false;
     showTourStep(0);
@@ -1234,6 +1308,8 @@
   function endTour() {
     $('tour').hidden = true;
     writeStore(TOUR_KEY, '1');
+    if (tourPractice) clearBreak(); // don't leave the practice break behind
+    tourPractice = false;
     window.scrollTo(0, 0);
     $('helpBtn').focus();
   }
@@ -1248,8 +1324,8 @@
   document.addEventListener('keydown', function (e) {
     if ($('tour').hidden) return;
     if (e.key === 'Escape') endTour();
-    else if (e.key === 'ArrowRight') $('tourNext').click();
-    else if (e.key === 'ArrowLeft') $('tourBack').click();
+    else if (e.key === 'ArrowRight' && !$('tourNext').hidden) $('tourNext').click();
+    else if (e.key === 'ArrowLeft' && !$('tourBack').hidden) $('tourBack').click();
   });
   window.addEventListener('resize', function () { if (!$('tour').hidden) placeTour(); });
 
