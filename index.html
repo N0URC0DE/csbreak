@@ -407,10 +407,15 @@
   }
   input[type="range"]::-moz-range-progress { background-color: var(--accent); height: 4px; border-radius: 2px; }
 
-  .start-btn {
-    width: 100%;
-    height: 50px;
+  .action-row {
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    gap: 10px;
     margin-top: 26px;
+  }
+  .start-btn {
+    -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+    min-width: 0;
+    height: 50px;
     font-size: 1.05rem;
     font-weight: 700;
     color: #ffffff;
@@ -422,6 +427,21 @@
   .start-btn:active { -webkit-transform: scale(0.98); transform: scale(0.98); background-color: var(--accent-press); }
   .start-btn.stop { background-color: #d64545; }
   .start-btn.stop:active { background-color: #bb3a3a; }
+  /* Clears the current break (running or stopped) back to "Ready to start" */
+  .cancel-btn {
+    -webkit-flex-shrink: 0; flex-shrink: 0;
+    height: 50px;
+    padding: 0 20px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    background-color: var(--surface);
+    -webkit-border-radius: 25px; border-radius: 25px;
+    -webkit-transition: -webkit-transform 0.12s, background-color 0.2s;
+    transition: transform 0.12s, background-color 0.2s;
+  }
+  .cancel-btn:active { -webkit-transform: scale(0.97); transform: scale(0.97); background-color: var(--surface-press); }
+  .cancel-btn[hidden] { display: none; }
 
   .summary {
     margin-top: 8px;
@@ -597,7 +617,10 @@
       </div>
     </div>
 
-    <button type="button" class="start-btn" id="startBtn">Start Break</button>
+    <div class="action-row">
+      <button type="button" class="start-btn" id="startBtn">Start Break</button>
+      <button type="button" class="cancel-btn" id="cancelBtn" hidden>Cancel</button>
+    </div>
 
     <label class="save-row">
       <input type="checkbox" id="autoStopToggle" checked>
@@ -916,6 +939,7 @@
   function setButton(text, isStop) {
     startBtn.textContent = text;
     startBtn.classList.toggle('stop', isStop);
+    $('cancelBtn').hidden = state.start === null;
   }
 
   var RING_LEN = 2 * Math.PI * 96; // circumference of the progress circle (r=96)
@@ -977,6 +1001,18 @@
     setWheel(state.start);
     render();
     save();
+  });
+
+  // Cancel: throw the current break away (no summary) and go back to the defaults screen.
+  $('cancelBtn').addEventListener('click', function () {
+    var running = state.start !== null && state.stopped === null;
+    if (running && !window.confirm('Cancel this break? The timer will be cleared.')) return;
+    state.start = null;
+    state.stopped = null;
+    wheelTouched = false; // wheel follows the clock again
+    lastMinute = -1;
+    save();
+    render();
   });
 
   $('nowBtn').addEventListener('click', function () {
