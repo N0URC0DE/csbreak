@@ -249,7 +249,7 @@
   @-webkit-keyframes glow { 0%, 100% { -webkit-box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { -webkit-box-shadow: 0 0 14px 6px rgba(143, 168, 245, 0.85); } }
   @keyframes glow { 0%, 100% { box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5); } 50% { box-shadow: 0 0 14px 6px rgba(143, 168, 245, 0.85); } }
 
-  /* From 60% of the break: light warning, everything that was blue turns orange */
+  /* Light warning ("start wrapping up"): everything that was blue turns orange */
   .caution .status,
   .caution .ring-big { color: var(--orange); }
   .caution .ring-fill { stroke: var(--orange); }
@@ -257,7 +257,7 @@
   .caution .live-dot,
   .caution .live-dot::after { background-color: var(--orange); }
 
-  /* From 85% of the break: heavy warning, red */
+  /* Heavy warning ("head back now"): red */
   .warning .status,
   .warning .ring-big { color: var(--red); }
   .warning .ring-fill { stroke: var(--red); }
@@ -894,10 +894,19 @@
   }
 
   var lastMinute = -1;
-  // Warning stages, as a share of the break: light (orange) from 60%, heavy (red) from 85%.
-  // The end-of-break notifications use the same points.
-  var CAUTION_AT = 0.6;
-  var WARN_AT = 0.85;
+  // Warning lead times (time left when each stage starts), for a break of `minutes`:
+  //   red    ("head back now")      = min(25% of the break, 0.8 × √minutes), at most 8 min
+  //   orange ("start wrapping up")  = min(40% of the break, 2 × red)
+  // Getting back to your desk takes about the same time whatever the break length, so the
+  // lead grows slowly (√) instead of in proportion; the % caps keep short breaks sensible.
+  // e.g. 5 min → 2:00 / 1:15 · 15 → 6:00 / 3:00 · 60 → 12:30 / 6:15 · 120 → 16:00 / 8:00
+  // Rounded to 15 s so notifications read cleanly. The notifications use the same points.
+  function warningLeads(minutes) {
+    var red = Math.min(minutes * 0.25, 0.8 * Math.sqrt(minutes), 8);
+    var orange = Math.min(minutes * 0.4, 2 * red);
+    var round15 = function (min) { return Math.max(15, Math.round(min * 60 / 15) * 15) * 1000; };
+    return { caution: round15(orange), warn: round15(red) };
+  }
   var lastPhase = null; // 'ok' | 'caution' | 'warn' | 'over' for the live break, null otherwise
 
   // ---------- Sounds (generated with Web Audio, so they work offline) ----------
@@ -992,12 +1001,13 @@
     }
     setRunning(!stopped && at >= state.start, over ? '+' + fmtElapsed(overMs) + ' over' : fmtRemaining(total - elapsed));
 
-    // Orange from 60%, red from 85% until the break is stopped (notifications mark those points);
-    // the alarm rings at the end, which also covers phones without notifications.
+    // Orange, then red as the end gets close (see warningLeads) until the break is stopped;
+    // notifications mark those points, and the alarm rings at the end for phones without them.
     var live = !stopped && at >= state.start;
-    var share = elapsed / total;
-    var warn = live && share >= WARN_AT;
-    var caution = live && !warn && share >= CAUTION_AT;
+    var leads = warningLeads(state.duration);
+    var left = total - elapsed;
+    var warn = live && left <= leads.warn;
+    var caution = live && !warn && left <= leads.caution;
     cardEl.classList.toggle('caution', caution);
     cardEl.classList.toggle('warning', warn);
     var phase = !live ? null : over ? 'over' : warn ? 'warn' : caution ? 'caution' : 'ok';
@@ -1192,13 +1202,14 @@
     if (state.start === null || state.stopped !== null) return;
     var total = state.duration * MIN;
     var endAt = state.start + total;
+    var leads = warningLeads(state.duration);
     // One notification at each warning point and one at the end; points already passed are skipped.
     var notifications = [
       // ttl: a reminder that can't be delivered before the break ends is dropped instead of arriving late.
-      { at: state.start + total * CAUTION_AT, title: '⏳ ' + fmtRemaining(total * (1 - CAUTION_AT)) + ' left on your break',
-        body: 'Back at ' + hhmm(endAt) + '.', ttl: total * (1 - CAUTION_AT) / 1000 },
-      { at: state.start + total * WARN_AT, title: '⚠️ Almost time: ' + fmtRemaining(total * (1 - WARN_AT)) + ' left',
-        body: 'Start heading back. Due at ' + hhmm(endAt) + '.', ttl: total * (1 - WARN_AT) / 1000, urgent: true },
+      { at: endAt - leads.caution, title: '⏳ ' + fmtRemaining(leads.caution) + ' left on your break',
+        body: 'Back at ' + hhmm(endAt) + '.', ttl: leads.caution / 1000 },
+      { at: endAt - leads.warn, title: '⚠️ Almost time: ' + fmtRemaining(leads.warn) + ' left',
+        body: 'Start heading back. Due at ' + hhmm(endAt) + '.', ttl: leads.warn / 1000, urgent: true },
       { at: endAt, title: "Break's over ☕", body: 'Time to head back to your desk.', ttl: 600, urgent: true }
     ].filter(function (n) { return n.at > Date.now() + 1000; });
     if (!notifications.length) return;
@@ -1305,7 +1316,7 @@
         { targets: ['startBtn'], waitFor: 'start', title: 'Try it: start a break',
           text: 'Tap Start Break to see it in action.' },
         { targets: ['track', 'ringTimes'], noBack: true, title: 'It\'s counting down',
-          text: 'Watch the seconds tick. It turns orange at 60% and red at 85%, with a notification at each point, and an alarm rings when it ends.' },
+          text: 'Watch the seconds tick. It turns orange when it\'s time to wrap up and red when it\'s time to head back, with a notification at each point, and an alarm rings when it ends.' },
         { targets: ['startBtn'], waitFor: 'stop', noBack: true, title: 'Now stop it',
           text: 'Back at your desk? Tap Stop Break.' },
         { targets: ['statusRow', 'summary', 'track'], noBack: true, title: 'Stopped',
@@ -1315,7 +1326,7 @@
         { targets: ['actionRow'], title: 'Start and stop',
           text: 'Start Break starts the timer. While it runs, Stop Break ends it and tells you how long you took; Cancel throws it away.' },
         { targets: ['track'], title: 'Watch the countdown',
-          text: 'It turns orange at 60% and red at 85%, with a notification at each point, and an alarm rings when it ends.' });
+          text: 'It turns orange when it\'s time to wrap up and red when it\'s time to head back, with a notification at each point, and an alarm rings when it ends.' });
     }
     steps.push(
       { targets: ['autoStopRow'], title: 'Auto-stop',
