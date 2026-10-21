@@ -946,7 +946,7 @@
     osc.stop(startAt + length);
   }
 
-  // Break over: longer and louder alarm (~3 s of alternating tones).
+  // Break over: longer and louder alarm (~3 s of alternating tones), used only without notifications.
   function playEnd() {
     if (!audioCtx) return;
     var t = audioCtx.currentTime + 0.05;
@@ -1012,7 +1012,8 @@
     cardEl.classList.toggle('warning', warn);
     var phase = !live ? null : over ? 'over' : warn ? 'warn' : caution ? 'caution' : 'ok';
     // Only a change seen while the page is open sounds; loading mid-phase stays quiet.
-    if (lastPhase && phase && phase !== lastPhase && phase === 'over') playEnd();
+    // The app stays silent when notifications are on; the alarm is only the fallback without them.
+    if (lastPhase && phase && phase !== lastPhase && phase === 'over' && !notificationsOn()) playEnd();
     lastPhase = phase;
 
     // Auto-stop: end the break exactly at its end time, logging the planned duration.
@@ -1244,6 +1245,11 @@
     }).catch(function () {});
   }
 
+  // Notifications will reach this phone (supported, allowed, and the option is on).
+  function notificationsOn() {
+    return pushSupported && notifyToggle.checked && Notification.permission === 'granted';
+  }
+
   notifyToggle.addEventListener('change', function () {
     if (notifyToggle.checked) scheduleEndNotification(true);
     else cancelEndNotification();
@@ -1316,7 +1322,7 @@
         { targets: ['startBtn'], waitFor: 'start', title: 'Try it: start a break',
           text: 'Tap Start Break to see it in action.' },
         { targets: ['track', 'ringTimes'], noBack: true, title: 'It\'s counting down',
-          text: 'Watch the seconds tick. It turns orange when it\'s time to wrap up and red when it\'s time to head back, with a notification at each point, and an alarm rings when it ends.' },
+          text: 'Watch the seconds tick. It turns orange when it\'s time to wrap up and red when it\'s time to head back, with a notification at each point and at the end.' },
         { targets: ['startBtn'], waitFor: 'stop', noBack: true, title: 'Now stop it',
           text: 'Back at your desk? Tap Stop Break.' },
         { targets: ['statusRow', 'summary', 'track'], noBack: true, title: 'Stopped',
@@ -1326,7 +1332,7 @@
         { targets: ['actionRow'], title: 'Start and stop',
           text: 'Start Break starts the timer. While it runs, Stop Break ends it and tells you how long you took; Cancel throws it away.' },
         { targets: ['track'], title: 'Watch the countdown',
-          text: 'It turns orange when it\'s time to wrap up and red when it\'s time to head back, with a notification at each point, and an alarm rings when it ends.' });
+          text: 'It turns orange when it\'s time to wrap up and red when it\'s time to head back, with a notification at each point and at the end.' });
     }
     steps.push(
       { targets: ['autoStopRow'], title: 'Auto-stop',
