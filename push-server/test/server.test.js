@@ -1,6 +1,6 @@
 // End-to-end check against `wrangler dev` (local Durable Objects + alarms):
-// a scheduled break notification arrives at its time and decrypts, a cancelled one never
-// arrives, and other websites / bad input are rejected.
+// a break's notifications (60%, 85%, end) arrive in order at their times and decrypt, cancelled
+// ones never arrive, and other websites / bad input are rejected.
 // Run: npx wrangler dev --port 8790  (with ALLOW_HTTP_PUSH=1 in .dev.vars), then node test/server.test.js
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -29,35 +29,49 @@ async function fakeSubscription(path) {
 const post = (path, body, origin = ORIGIN) => fetch(SERVER + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body) });
 
 try {
-  // 1) Scheduled notification arrives at the end time and decrypts.
+  // 1) Three notifications for one break arrive in order, each at its time.
   const a = await fakeSubscription('/device-a');
-  const endAt = Date.now() + 3000;
-  let r = await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, endAt, title: "Break's over", body: 'Time to head back ☕' });
+  const t0 = Date.now();
+  const notifications = [
+    { at: t0 + 2000, title: '6 min left on your break', body: 'Back at 6:03 PM.', ttl: 360 },
+    { at: t0 + 4000, title: 'Almost time: 2m 15s left', body: 'Start heading back.' },
+    { at: t0 + 6000, title: "Break's over ☕", body: 'Time to head back to your desk.', urgent: true }
+  ];
+  let r = await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, notifications });
   assert.equal(r.status, 200, 'schedule accepted');
   assert.equal(r.headers.get('access-control-allow-origin'), ORIGIN);
 
   // 2) Another device schedules, then cancels: nothing should arrive for it.
   const b = await fakeSubscription('/device-b');
-  assert.equal((await post('/schedule', { id: 'device-b-0123456789', subscription: b.sub, endAt: Date.now() + 2500 })).status, 200);
+  assert.equal((await post('/schedule', { id: 'device-b-0123456789', subscription: b.sub, notifications: [{ at: Date.now() + 2500, title: 'x' }] })).status, 200);
   assert.equal((await post('/cancel', { id: 'device-b-0123456789' })).status, 200);
 
-  await sleep(6000);
+  await sleep(9000);
   const forA = received.filter(x => x.path === '/device-a');
-  assert.equal(forA.length, 1, 'exactly one push for device A');
-  const lateBy = forA[0].at - endAt;
-  assert.ok(lateBy >= -50 && lateBy < 2000, `push sent at the end time (off by ${lateBy} ms)`);
+  assert.equal(forA.length, 3, 'three pushes for device A');
+  const lateness = [];
+  for (let i = 0; i < 3; i++) {
+    const msg = JSON.parse(await decrypt(forA[i].body, a.ua.privateKey, a.pub, a.auth));
+    assert.equal(msg.title, notifications[i].title, `push ${i + 1} in order`);
+    assert.equal(msg.urgent, !!notifications[i].urgent);
+    lateness.push(forA[i].at - notifications[i].at);
+    assert.ok(lateness[i] >= -50 && lateness[i] < 2000, `push ${i + 1} on time (off by ${lateness[i]} ms)`);
+  }
   assert.match(forA[0].headers.authorization, /^vapid t=/);
-  const msg = JSON.parse(await decrypt(forA[0].body, a.ua.privateKey, a.pub, a.auth));
-  assert.deepEqual(msg, { title: "Break's over", body: 'Time to head back ☕' });
+  assert.equal(forA[0].headers.ttl, '360', 'reminder expires with the break');
+  assert.equal(forA[2].headers.ttl, '600', 'default validity');
+  assert.equal(forA[0].headers.urgency, 'high');
   assert.equal(received.filter(x => x.path === '/device-b').length, 0, 'cancelled push never sent');
 
   // 3) Rejections.
-  assert.equal((await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, endAt: Date.now() + 5000 }, 'https://evil.example')).status, 403, 'other origins rejected');
-  assert.equal((await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, endAt: Date.now() - 1000 })).status, 400, 'past endAt rejected');
-  assert.equal((await post('/schedule', { id: 'x', subscription: a.sub, endAt: Date.now() + 5000 })).status, 400, 'bad id rejected');
-  assert.equal((await post('/schedule', { id: 'device-a-0123456789', subscription: { endpoint: 'nope' }, endAt: Date.now() + 5000 })).status, 400, 'bad subscription rejected');
+  const one = at => [{ at, title: 'x' }];
+  assert.equal((await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, notifications: one(Date.now() + 5000) }, 'https://evil.example')).status, 403, 'other origins rejected');
+  assert.equal((await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, notifications: one(Date.now() - 1000) })).status, 400, 'past time rejected');
+  assert.equal((await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, notifications: Array(6).fill(one(Date.now() + 5000)[0]) })).status, 400, 'too many rejected');
+  assert.equal((await post('/schedule', { id: 'x', subscription: a.sub, notifications: one(Date.now() + 5000) })).status, 400, 'bad id rejected');
+  assert.equal((await post('/schedule', { id: 'device-a-0123456789', subscription: { endpoint: 'nope' }, notifications: one(Date.now() + 5000) })).status, 400, 'bad subscription rejected');
 
-  console.log(`server: push delivered ${lateBy} ms after the end time, cancel works, bad requests rejected`);
+  console.log(`server: 3 pushes delivered in order (late by ${lateness.join(' / ')} ms), cancel works, bad requests rejected`);
 } finally {
   push.close();
 }

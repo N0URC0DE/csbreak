@@ -1,6 +1,6 @@
 // Offline support: keep the app's files cached so it opens without internet.
 // Bump VERSION whenever any of these files change, so phones pick up the update.
-var VERSION = 'break-timer-v15';
+var VERSION = 'break-timer-v16';
 var FILES = [
   './',
   './index.html',
@@ -52,17 +52,18 @@ self.addEventListener('fetch', function (event) {
   );
 });
 
-// End-of-break notification sent by the push server (see push-server/). It replaces the quiet
-// "On break until …" notification (same tag) and buzzes even if the app is closed.
+// Break notifications sent by the push server (see push-server/): reminders at 60% and 85% of the
+// break, then the urgent "Break's over". Each replaces the previous one (same tag) and buzzes even
+// if the app is closed; the urgent one stays until dismissed.
 self.addEventListener('push', function (event) {
   var data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) {}
   event.waitUntil(self.registration.showNotification(data.title || "Break's over ☕", {
-    body: data.body || 'Time to head back to your desk.',
+    body: data.body || '',
     tag: 'break',
     renotify: true,
-    requireInteraction: true,
-    vibrate: [300, 150, 300, 150, 600],
+    requireInteraction: !!data.urgent,
+    vibrate: data.urgent ? [300, 150, 300, 150, 600] : [200],
     icon: 'icons/icon-192.png'
   }));
 });
