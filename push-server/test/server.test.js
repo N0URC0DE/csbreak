@@ -35,7 +35,7 @@ try {
   const notifications = [
     { at: t0 + 2000, title: '6 min left on your break', body: 'Back at 6:03 PM.', ttl: 360 },
     { at: t0 + 4000, title: 'Almost time: 2m 15s left', body: 'Start heading back.' },
-    { at: t0 + 6000, title: "Break's over ☕", body: 'Time to head back to your desk.', urgent: true }
+    { at: t0 + 6000, title: "Break's over ☕", body: 'Time to head back to your desk.', urgent: true, final: true }
   ];
   let r = await post('/schedule', { id: 'device-a-0123456789', subscription: a.sub, notifications });
   assert.equal(r.status, 200, 'schedule accepted');
@@ -54,6 +54,7 @@ try {
     const msg = JSON.parse(await decrypt(forA[i].body, a.ua.privateKey, a.pub, a.auth));
     assert.equal(msg.title, notifications[i].title, `push ${i + 1} in order`);
     assert.equal(msg.urgent, !!notifications[i].urgent);
+    assert.equal(msg.final, !!notifications[i].final);
     lateness.push(forA[i].at - notifications[i].at);
     assert.ok(lateness[i] >= -50 && lateness[i] < 2000, `push ${i + 1} on time (off by ${lateness[i]} ms)`);
   }

@@ -1,6 +1,6 @@
 // Offline support: keep the app's files cached so it opens without internet.
 // Bump VERSION whenever any of these files change, so phones pick up the update.
-var VERSION = 'break-timer-v19';
+var VERSION = 'break-timer-v21';
 var FILES = [
   './',
   './index.html',
@@ -52,9 +52,10 @@ self.addEventListener('fetch', function (event) {
   );
 });
 
-// Break notifications sent by the push server (see push-server/): reminders at 60% and 85% of the
-// break, then the urgent "Break's over". Each replaces the previous one (same tag) and buzzes even
-// if the app is closed; the urgent one stays until dismissed.
+// Break notifications sent by the push server (see push-server/): the warning reminders, then the
+// final "Break's over". Together with the app's "On break until …" they keep one notification in the
+// shade for the whole break: each replaces the previous one (same tag), stays until the break ends
+// (requireInteraction) and buzzes even if the app is closed; the warnings and the end buzz harder.
 self.addEventListener('push', function (event) {
   var data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) {}
@@ -62,15 +63,17 @@ self.addEventListener('push', function (event) {
     body: data.body || '',
     tag: 'break',
     renotify: true,
-    requireInteraction: !!data.urgent,
+    requireInteraction: true,
     vibrate: data.urgent ? [300, 150, 300, 150, 600] : [200],
-    icon: 'icons/icon-192.png'
+    icon: 'icons/icon-192.png',
+    data: { final: !!data.final }
   }));
 });
 
-// Tapping a notification brings the app to the front (or opens it).
+// Tapping a notification brings the app to the front (or opens it). During the break it stays in
+// the shade; the final "Break's over" one is dismissed by the tap.
 self.addEventListener('notificationclick', function (event) {
-  event.notification.close();
+  if (event.notification.data && event.notification.data.final) event.notification.close();
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
       for (var i = 0; i < list.length; i++) {

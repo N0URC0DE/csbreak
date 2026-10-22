@@ -70,7 +70,8 @@ export default {
       queue.push({ at, ttl, message: {
         title: String(n.title || "Break's over").slice(0, 80),
         body: String(n.body || '').slice(0, 160),
-        urgent: !!n.urgent
+        urgent: !!n.urgent,
+        final: !!n.final
       } });
     }
     queue.sort((a, b) => a.at - b.at);

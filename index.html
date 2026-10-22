@@ -1214,7 +1214,7 @@
         body: 'Back at ' + hhmm(endAt) + '.', ttl: leads.caution / 1000 },
       { at: endAt - leads.warn, title: '⚠️ Almost time: ' + fmtRemaining(leads.warn) + ' left',
         body: 'Start heading back. Due at ' + hhmm(endAt) + '.', ttl: leads.warn / 1000, urgent: true },
-      { at: endAt, title: "Break's over ☕", body: 'Time to head back to your desk.', ttl: 600, urgent: true }
+      { at: endAt, title: "Break's over ☕", body: 'Time to head back to your desk.', ttl: 600, urgent: true, final: true }
     ].filter(function (n) { return n.at > Date.now() + 1000; });
     if (!notifications.length) return;
     var perm = Notification.permission === 'default' && allowPrompt
@@ -1226,10 +1226,7 @@
         return reg.pushManager.getSubscription().then(function (sub) {
           return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(VAPID_PUBLIC_KEY) });
         }).then(function (sub) {
-          reg.showNotification('On break until ' + hhmm(endAt), {
-            tag: 'break', silent: true, icon: 'icons/icon-192.png',
-            body: "We'll remind you as the end gets close."
-          });
+          showBreakNotification(reg);
           return fetch(PUSH_SERVER + '/schedule', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: deviceId(), subscription: sub.toJSON(), notifications: notifications })
@@ -1237,6 +1234,34 @@
         });
       });
     }).catch(function () {}); // no network or no push support: the in-app alarm still works when open
+  }
+
+  // The quiet notification that sits in the shade while the break runs. It shows the current
+  // stage, so it can also be put back if it was swiped away (see restoreBreakNotification).
+  function showBreakNotification(reg) {
+    var total = state.duration * MIN;
+    var endAt = state.start + total;
+    var left = endAt - Date.now();
+    var leads = warningLeads(state.duration);
+    var title = left <= leads.warn ? '⚠️ Almost time: ' + fmtRemaining(left) + ' left'
+      : left <= leads.caution ? '⏳ ' + fmtRemaining(left) + ' left on your break'
+      : 'On break until ' + hhmm(endAt);
+    return reg.showNotification(title, {
+      tag: 'break', silent: true, requireInteraction: true, icon: 'icons/icon-192.png',
+      body: left <= leads.caution ? 'Back at ' + hhmm(endAt) + '.' : "We'll remind you as the end gets close.",
+      data: { final: false }
+    });
+  }
+
+  // Opening the app during a break puts the shade notification back if it's gone.
+  function restoreBreakNotification() {
+    if (!notificationsOn() || state.start === null || state.stopped !== null) return;
+    if (state.start + state.duration * MIN - Date.now() < 2000) return; // the end notice takes over
+    navigator.serviceWorker.ready.then(function (reg) {
+      return reg.getNotifications({ tag: 'break' }).then(function (list) {
+        if (!list.length) return showBreakNotification(reg);
+      });
+    }).catch(function () {});
   }
 
   function cancelEndNotification() {
@@ -1259,7 +1284,11 @@
   });
   updateNotifyRow();
 
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) return;
+    render();
+    restoreBreakNotification();
+  });
 
   // ---------- Theme ----------
   var themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -1300,6 +1329,7 @@
   renderDuration();
   render();
   setInterval(render, 1000);
+  restoreBreakNotification();
 
   // ---------- Walkthrough ----------
   // Spotlights one part of the screen at a time. On a fresh screen it is hands-on: the user taps
