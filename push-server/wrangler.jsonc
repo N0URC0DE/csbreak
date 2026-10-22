@@ -2,6 +2,8 @@
   "name": "csbreak-push",
   "main": "src/index.js",
   "compatibility_date": "2026-09-01",
+  // Keep logs for a few days (Workers Logs) so delivery problems can be checked afterwards.
+  "observability": { "enabled": true },
   "vars": {
     // Public half of the VAPID key pair; the private half is the VAPID_PRIVATE_KEY secret.
     "VAPID_PUBLIC_KEY": "BMpcScvPYzzA2iQYjGFQ6oDrSrLrTScFlY8kdpjH7T_H5mOCaRB1GeZ1nbXH62QvX4MD4TpZrlG1SR5biV6k-o0",

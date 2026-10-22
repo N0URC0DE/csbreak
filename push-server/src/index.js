@@ -52,6 +52,7 @@ export default {
 
     const stub = env.BREAKS.get(env.BREAKS.idFromName(body.id));
     if (url.pathname === '/cancel') {
+      console.log(JSON.stringify({ event: 'cancel', device: body.id.slice(0, 6) }));
       await stub.cancel();
       return json(200, { ok: true }, headers);
     }
@@ -73,6 +74,9 @@ export default {
       } });
     }
     queue.sort((a, b) => a.at - b.at);
+    // Delivery log (no personal data): which device, which push service, when each is due.
+    console.log(JSON.stringify({ event: 'schedule', device: body.id.slice(0, 6), service: new URL(body.subscription.endpoint).host,
+      inSeconds: queue.map(n => Math.round((n.at - now) / 1000)) }));
     await stub.schedule({ subscription: body.subscription, queue });
     return json(200, { ok: true, count: queue.length }, headers);
   }
@@ -104,6 +108,8 @@ export class BreakAlarm extends DurableObject {
         privateKey: this.env.VAPID_PRIVATE_KEY,
         subject: this.env.VAPID_SUBJECT
       }, { ttl: next.ttl || 600 });
+      console.log(JSON.stringify({ event: 'push', service: new URL(job.subscription.endpoint).host, status,
+        lateMs: Date.now() - next.at, skipped: due.length - 1, remaining: later.length, title: next.message.title }));
       // Retry later on push-service hiccups (throwing makes the alarm retry with backoff).
       if (status === 429 || status >= 500) throw new Error(`push service returned ${status}`);
       // The subscription is gone (app uninstalled, permission revoked): drop the rest too.

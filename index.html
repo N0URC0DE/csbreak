@@ -1072,9 +1072,12 @@
   }
 
   function stopBreak(at) {
+    // Stopped early: drop the pending notifications. At or after the end (auto-stop, the 2x safety
+    // stop, or a late Stop) they are already due or sent; cancelling would race the server and lose
+    // the "Break's over" notification.
+    if (at < state.start + state.duration * MIN) cancelEndNotification();
     state.stopped = at;
     save();
-    cancelEndNotification();
     // Release the wheel from this break's start time so a new break doesn't reuse it.
     wheelTouched = false;
     lastMinute = -1;
