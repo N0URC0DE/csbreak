@@ -1215,11 +1215,14 @@
     // One notification at each warning point and one at the end; points already passed are skipped.
     var notifications = [
       // ttl: a reminder that can't be delivered before the break ends is dropped instead of arriving late.
+      // Phones stay out of the office, so the red one is the last you'll see on the way: by the
+      // end you should already be at your desk.
       { at: endAt - leads.caution, title: '⏳ ' + fmtRemaining(leads.caution) + ' left on your break',
-        body: 'Back at ' + hhmm(endAt) + '.', ttl: leads.caution / 1000 },
-      { at: endAt - leads.warn, title: '⚠️ Almost time: ' + fmtRemaining(leads.warn) + ' left',
-        body: 'Start heading back. Due at ' + hhmm(endAt) + '.', ttl: leads.warn / 1000, urgent: true },
-      { at: endAt, title: "Break's over ☕", body: 'Time to head back to your desk.', ttl: 600, urgent: true, final: true }
+        body: 'Start wrapping up. Due back at ' + hhmm(endAt) + '.', ttl: leads.caution / 1000 },
+      { at: endAt - leads.warn, title: "⚠️ Time's running out: " + fmtRemaining(leads.warn) + ' left',
+        body: 'Head back now. Be at your desk by ' + hhmm(endAt) + '.', ttl: leads.warn / 1000, urgent: true },
+      // If you're reading the last one you're still out with your phone, so it says you're late.
+      { at: endAt, title: "⏰ You're late!", body: 'Your break ended at ' + hhmm(endAt) + '. Get back to your desk now.', ttl: 600, urgent: true, final: true }
     ].filter(function (n) { return n.at > Date.now() + 1000; });
     if (!notifications.length) return;
     var perm = Notification.permission === 'default' && allowPrompt
@@ -1248,12 +1251,14 @@
     var endAt = state.start + total;
     var left = endAt - Date.now();
     var leads = warningLeads(state.duration);
-    var title = left <= leads.warn ? '⚠️ Almost time: ' + fmtRemaining(left) + ' left'
+    var title = left <= leads.warn ? "⚠️ Time's running out: " + fmtRemaining(left) + ' left'
       : left <= leads.caution ? '⏳ ' + fmtRemaining(left) + ' left on your break'
       : 'On break until ' + hhmm(endAt);
     return reg.showNotification(title, {
       tag: 'break', silent: true, requireInteraction: true, icon: 'icons/icon-192.png',
-      body: left <= leads.caution ? 'Back at ' + hhmm(endAt) + '.' : "We'll remind you as the end gets close.",
+      body: left <= leads.warn ? 'Head back now. Be at your desk by ' + hhmm(endAt) + '.'
+        : left <= leads.caution ? 'Start wrapping up. Due back at ' + hhmm(endAt) + '.'
+        : "We'll remind you as the end gets close.",
       data: { final: false }
     });
   }

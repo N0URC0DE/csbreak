@@ -1,6 +1,6 @@
 // Offline support: keep the app's files cached so it opens without internet.
 // Bump VERSION whenever any of these files change, so phones pick up the update.
-var VERSION = 'break-timer-v22';
+var VERSION = 'break-timer-v24';
 var FILES = [
   './',
   './index.html',
@@ -59,7 +59,7 @@ self.addEventListener('fetch', function (event) {
 self.addEventListener('push', function (event) {
   var data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) {}
-  event.waitUntil(self.registration.showNotification(data.title || "Break's over ☕", {
+  event.waitUntil(self.registration.showNotification(data.title || "⏰ You're late!", {
     body: data.body || '',
     tag: 'break',
     renotify: true,
