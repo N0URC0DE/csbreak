@@ -1098,8 +1098,13 @@
     renderDuration();
     render();
     save();
-    if (state.start !== null && state.stopped === null) scheduleEndNotification(false); // new end time
+    // New end time: reschedule once the slider settles, not on every step of a drag.
+    if (state.start !== null && state.stopped === null) {
+      clearTimeout(rescheduleTimer);
+      rescheduleTimer = setTimeout(function () { scheduleEndNotification(false); }, 800);
+    }
   }
+  var rescheduleTimer = null;
 
   // ---------- Events ----------
   startBtn.addEventListener('click', function () {
